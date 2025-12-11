@@ -5,6 +5,14 @@ import {
   type HydratedDocument,
 } from "mongoose";
 
+const passwordResetSchema = new Schema(
+  {
+    tokenHash: { type: String },
+    expiresAt: { type: Date },
+    requestedAt: { type: Date },
+  },
+  { _id: false }
+);
 /**
  * Subdocument: OAuth / social providers (Google, GitHub, etc.)
  */
@@ -37,39 +45,25 @@ const providerSchema = new Schema(
   { _id: false } // no separate _id needed per provider
 );
 
-const sessionSchema = new Schema(
-  {
-    sessionId: String,
-    userAgent: String,
-    device: {
-      model: String,
-      vendor: String,
-      type: String,
-    },
-    browser: {
-      name: String,
-      version: String,
-    },
-    os: {
-      name: String,
-      version: String,
-    },
-    ipInfo: {
-      ip: String,
-      city: String,
-      country: String,
-      timezone: String,
-      lat: String,
-      lng: String,
-      isp: String,
-    },
-    cpu: String,
-    engine: String,
-    createdAt: Date,
-    lastUsedAt: Date,
+const privacyPrefsSchema = new Schema({
+  profileVisibility: {
+    type: String,
+    enum: ["private", "public", "unlisted"],
+    default: "private",
   },
-  { _id: false }
-);
+  showEmailOnProfile: {
+    type: Boolean,
+    default: false,
+  },
+  showLinksOnProfile: {
+    type: Boolean,
+    default: true,
+  },
+  allowDiscoverability: {
+    type: Boolean,
+    default: true,
+  },
+});
 
 /**
  * Subdocument: notification preferences
@@ -125,7 +119,7 @@ const usageSchema = new Schema(
  */
 const userSchema = new Schema(
   {
-    // Core identity
+    // Core identity - Basic info
     email: {
       type: String,
       required: true,
@@ -134,9 +128,9 @@ const userSchema = new Schema(
       trim: true,
       index: true,
     },
-    emailVerified: {
-      type: Boolean,
-      default: false,
+    phoneNumber: {
+      type: String,
+      trim: true,
     },
     displayName: {
       type: String,
@@ -165,46 +159,11 @@ const userSchema = new Schema(
       website: String,
       youtube: String,
       twitter: String,
+      instagram: String,
+      linkedin: String,
+      facebook: String,
+      github: String,
     },
-
-    // Auth (password-based)
-    passwordHash: {
-      type: String,
-      required: true,
-    },
-    lastPasswordChangeAt: {
-      type: Date,
-      default: Date.now,
-    },
-    // OAuth providers (Google, GitHub, Meta, etc.)
-    providers: {
-      type: [providerSchema],
-      default: [],
-    },
-
-    // last Login
-    sessions: {
-      type: [sessionSchema],
-      default: [],
-    },
-
-    // Contact & recovery
-    phoneNumber: {
-      type: String,
-      trim: true,
-    },
-    phoneVerified: {
-      type: Boolean,
-      default: false,
-    },
-    passwordReset: {
-      // store hashed token + expiry if you implement reset
-      tokenHash: { type: String },
-      expiresAt: { type: Date },
-      requestedAt: { type: Date },
-    },
-
-    // Role, Plan, Account Status, Usage
     role: {
       type: String,
       enum: ["user", "admin"],
@@ -216,15 +175,65 @@ const userSchema = new Schema(
       enum: ["free", "pro", "enterprise"],
       default: "free",
     },
-    isActive: {
-      type: String,
-      enum: ["active", "suspended", "banned", "deleted"],
-      default: "active",
-    },
     usage: {
       type: usageSchema,
       default: () => ({}),
     },
+    // Auth (password-based)
+    passwordHash: {
+      type: String,
+      required: true,
+      select: false,
+    },
+    lastPasswordChangeAt: {
+      type: Date,
+      default: Date.now,
+    },
+    // Tokens (not selected by default)
+    passwordReset: {
+      type: passwordResetSchema,
+      select: false, // ✅ now it's an option on the field "passwordReset"
+    },
+    // OAuth providers (Google, GitHub, Meta, etc.)
+    oauthProviders: {
+      type: [providerSchema],
+      default: [],
+    },
+    // Security / 2FA
+    twoFactorEnabled: { type: Boolean, default: false },
+    twoFactorMethod: { type: String }, // "totp" | "sms" | "email"
+    twoFactorSecret: { type: String, select: false },
+    twoFactorBackupCodes: { type: [String], select: false },
+
+    // Contact verification
+    emailVerified: {
+      type: Boolean,
+      default: false,
+    },
+    phoneVerified: {
+      type: Boolean,
+      default: false,
+    },
+
+    // Account Status
+    accountStatus: {
+      type: String,
+      enum: ["active", "suspended", "banned", "deleted"],
+      default: "active",
+    },
+
+    // Billing
+    billingCustomerId: { type: String },
+    billingProvider: { type: String }, // "stripe" | "razorpay" | etc
+    subscriptionId: { type: String },
+    billingStatus: {
+      type: String,
+      enum: ["none", "active", "past_due", "canceled", "incomplete"],
+      default: "none",
+    },
+    currentPeriodEnd: { type: Date },
+    trialEndsAt: { type: Date },
+    cancelAtPeriodEnd: { type: Boolean, default: false },
 
     // Notification settings
     notificationPrefs: {
@@ -232,15 +241,15 @@ const userSchema = new Schema(
       default: () => ({}),
     },
 
-    //meta
-    timezone: {
-      type: String,
-      default: "Asia/Kolkata", // or leave undefined
+    // Privacy prefs
+    privacyPrefs: {
+      type: privacyPrefsSchema,
+      default: () => ({}),
     },
-    locale: {
-      type: String,
-      default: "en-IN",
-    },
+    // Legal / Terms
+    termsAcceptedAt: { type: Date },
+    privacyAcceptedAt: { type: Date },
+    marketingConsentAt: { type: Date },
     deletedAt: {
       type: Date,
     },

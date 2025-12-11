@@ -2,8 +2,10 @@ import { Router } from "express";
 import {
   forgotPasswordController,
   loginController,
+  refreshTokenController,
   registerController,
   resetPasswordController,
+  logoutController,
 } from "./auth.controller.js";
 import {
   forgotPasswordSchema,
@@ -35,5 +37,9 @@ router.post(
   validateBody(resetPasswordSchema),
   asyncHandler(resetPasswordController)
 );
+
+router.post("/refresh-token", asyncHandler(refreshTokenController));
+
+router.post("/logout", asyncHandler(logoutController));
 
 export default router;

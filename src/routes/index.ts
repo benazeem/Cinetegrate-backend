@@ -1,8 +1,35 @@
 import { Router } from "express";
-import  router from "@modules/auth/auth.routes.js";
+import type { Request, Response, NextFunction } from "express";
+import cors from "cors";
+import helmet from "helmet";
+import cookieParser from "cookie-parser";
+import getCorsConfig from "config/corsConfig.js";
+import devLogger from "@middleware/loggerMiddleware.js";
+import notFoundHandler from "@middleware/404/notFoundHandler.js";
+import errorHandler from "@middleware/error/globalErrorHandler.js";
 
-const apiRouter = Router();
+import apiRouter from "@routes/api.js";
 
-apiRouter.use("/auth", router)
+const AppRouter = Router();
 
-export default apiRouter;
+AppRouter.use(helmet());
+const corsOptions = getCorsConfig();
+AppRouter.use(cors(corsOptions));
+
+AppRouter.use(cookieParser());
+
+// Basic logger
+AppRouter.use(devLogger);
+
+// Health route
+AppRouter.get("/health", (_req: Request, res: Response) => {
+  res.status(200).json({ status: "ok" });
+});
+
+AppRouter.use("/api", apiRouter);
+
+AppRouter.use(notFoundHandler);
+
+AppRouter.use(errorHandler);
+
+export default AppRouter;

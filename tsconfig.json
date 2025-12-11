@@ -12,7 +12,7 @@
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-
+    "types": ["node", "express"],
     "baseUrl": "./src",
     "paths": {
       "@middleware/*": ["middleware/*"],
@@ -23,5 +23,6 @@
       "@routes/*":["routes/*"],
       "@validation/*":["validation/*"]
     }
-  }
+  },
+  "include": ["src"]
 }

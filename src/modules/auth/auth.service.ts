@@ -1,7 +1,14 @@
+import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
 import { UserModel, type User } from "@models/User.js";
-import { generateResetToken } from "@utils/tokens.js";
+import { SessionModel, type Session } from "@models/Session.js";
+import {
+  generateAccessToken,
+  generateCsrfToken,
+  generateRefreshToken,
+  generateResetToken,
+} from "@utils/tokens.js";
 import transporter from "@utils/mail.js";
 import type {
   LoginInput,
@@ -11,15 +18,42 @@ import type {
 import { getIpInfo } from "@utils/getIpInfo.js";
 import { parseUserAgent } from "@utils/parseUserAgent.js";
 
-type LoginDataType = LoginInput & {
+type LoginInputWithMeta = LoginInput & {
   userAgent: string;
   ip: string | string[] | undefined;
 };
 
-const RESET_EXP_MIN = Number(process.env.PASSWORD_RESET_EXPIRES_MIN || 60);
+type LoginOutput = {
+  user: User;
+  accessToken: string;
+  refreshToken: string;
+  csrfToken: string;
+};
 
-export async function registerUser(input: RegisterInput): Promise<User> {
-  const { email, password, displayName, username } = input;
+type RegisterInputWithMeta = RegisterInput & {
+  userAgent: string;
+  ip: string | string[] | undefined;
+};
+
+interface RegisterOutput {
+  user: User;
+  accessToken: string;
+  refreshToken: string;
+  csrfToken: string;
+}
+
+interface RefreshTokenOutput {
+  accessToken: string;
+  refreshToken: string;
+  csrfToken: string;
+}
+
+const RESET_EXP_MIN = Number(process.env.PASSWORD_RESET_EXPIRES_MIN || 10);
+
+export async function registerUser(
+  input: RegisterInputWithMeta
+): Promise<RegisterOutput> {
+  const { email, password, displayName, username, userAgent, ip } = input;
 
   // Check if email exists
   const existing = await UserModel.findOne({ email });
@@ -35,12 +69,16 @@ export async function registerUser(input: RegisterInput): Promise<User> {
     const newUsername = (
       email.split("@")[0] + crypto.randomBytes(2).toString(`hex`)
     ).toLowerCase();
-    const usernameExists = await UserModel.findOne({ newUsername });
+    const usernameExists = await UserModel.findOne({ username: newUsername });
     if (usernameExists) {
       generateusername();
     }
     return newUsername;
   };
+
+  // Metadata
+  const ipData: any = await getIpInfo(ip as string);
+  const userAgentInfo = parseUserAgent(userAgent);
 
   // Hash password
   const passwordHash = await bcrypt.hash(password, 10);
@@ -53,13 +91,41 @@ export async function registerUser(input: RegisterInput): Promise<User> {
     displayName: displayName ?? email.split("@")[0],
   });
 
-  return user;
+  const sessionId: string = crypto.randomBytes(32).toString("hex");
+
+  const session = await SessionModel.create({
+    sessionId,
+    userId: user._id,
+    userAgent,
+    device: userAgentInfo.device,
+    browser: userAgentInfo.browser,
+    os: userAgentInfo.os,
+
+    ip: ipData.ip,
+    city: ipData.cityName,
+    country: ipData.countryName,
+    timezone: ipData.timeZones[1],
+    lat: ipData.latitude,
+    lng: ipData.longitude,
+    isp: ipData.asnOrganisation,
+
+    createdAt: Date.now(),
+    lastUsedAt: Date.now(),
+  });
+
+  const accessToken = generateAccessToken(user._id, sessionId);
+  const refreshToken = generateRefreshToken(user._id, sessionId);
+  const csrfToken = generateCsrfToken();
+
+  return { user, accessToken, refreshToken, csrfToken };
 }
 
-export async function loginUser(input: LoginDataType): Promise<User> {
+export async function loginUser(
+  input: LoginInputWithMeta
+): Promise<LoginOutput> {
   const { email, password, userAgent, ip } = input;
 
-  const user = await UserModel.findOne({ email });
+  const user = await UserModel.findOne({ email }).select("+passwordHash");
   if (!user) {
     throw new Error("Email or Password does not match!");
   }
@@ -70,37 +136,33 @@ export async function loginUser(input: LoginDataType): Promise<User> {
   }
 
   const ipData: any = await getIpInfo(ip as string);
-  const sessionId = crypto.randomBytes(32).toString("hex");
   const userAgentInfo = parseUserAgent(userAgent);
+  const sessionId: string = crypto.randomBytes(32).toString("hex");
 
-  user.sessions.push({
+  const session = await SessionModel.create({
     sessionId,
+    userId: user._id,
+    userAgent,
     device: userAgentInfo.device,
     browser: userAgentInfo.browser,
     os: userAgentInfo.os,
-    ipInfo: {
-      ip: ipData.ip,
-      city: ipData.cityName,
-      country: ipData.countryName,
-      timezone: ipData.timeZones[1],
-      lat: ipData.latitude,
-      lng: ipData.longitude,
-      isp: ipData.asnOrganisation,
-    },
+
+    ip: ipData.ip,
+    city: ipData.cityName,
+    country: ipData.countryName,
+    timezone: ipData.timeZones[1],
+    lat: ipData.latitude,
+    lng: ipData.longitude,
+    isp: ipData.asnOrganisation,
+
     createdAt: Date.now(),
     lastUsedAt: Date.now(),
   });
+  const accessToken = generateAccessToken(user._id, sessionId);
+  const refreshToken = generateRefreshToken(user._id, sessionId);
+  const csrfToken = generateCsrfToken();
 
-  await user.save();
-
-  console.log(ipData, sessionId, userAgentInfo);
-
-  // user.sessions.push({
-  //   sessionId,
-
-  // })
-
-  return user;
+  return { user, accessToken, refreshToken, csrfToken };
 }
 
 export async function createPasswordResetRequest(email: string) {
@@ -178,12 +240,12 @@ export async function resetPassword(
   }
 
   // Good — set new password
-  const hashedPassword = await bcrypt.hash(newPassword, 10); // cost 12 suggested
+  const hashedPassword = await bcrypt.hash(newPassword, 10);
   user.passwordHash = hashedPassword;
-
   user.passwordReset = undefined;
-
   await user.save();
+
+  await SessionModel.deleteMany({ userId: user._id });
 
   // Optionally email the user notifying password change
   await transporter.sendMail({
@@ -193,5 +255,60 @@ export async function resetPassword(
     text: `Your password was changed. If you did not do this, please contact support immediately.`,
   });
 
+  return;
+}
+
+export async function refreshTokens(
+  refreshToken: string
+): Promise<RefreshTokenOutput> {
+  let decoded;
+  try {
+    decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET!) as {
+      userId: string;
+      sessionId: string;
+    };
+  } catch (err) {
+    throw new Error("Invalid refresh token");
+  }
+
+  const user = await UserModel.findOne({
+    _id: decoded.userId,
+  });
+  const session = await SessionModel.findOne({
+    sessionId: decoded.sessionId,
+    userId: decoded.userId,
+  });
+
+  if (!decoded || !user || !session || session.revokedAt)
+    throw new Error("Invalid refresh token");
+
+  // ✅ update lastUsedAt for this session
+  session.lastUsedAt = new Date();
+  await session.save();
+  const accessToken = generateAccessToken(user._id, session.sessionId);
+  const newRefreshToken = generateRefreshToken(user._id, session.sessionId);
+  const csrfToken = generateCsrfToken();
+
+  return { accessToken, refreshToken: newRefreshToken, csrfToken };
+}
+
+export async function logoutUser(refreshToken: string) {
+  let decoded;
+  try {
+    decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET!) as {
+      userId: string;
+      sessionId: string;
+    };
+  } catch (err) {
+    throw new Error("Invalid refresh token");
+  }
+  const session = await SessionModel.findOne({
+    sessionId: decoded.sessionId,
+    userId: decoded.userId,
+  });
+  if (session && !session.revokedAt) {
+    session.revokedAt = new Date();
+    await session.save();
+  }
   return;
 }

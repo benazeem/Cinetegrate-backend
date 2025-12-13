@@ -2,18 +2,22 @@ import type { CookieOptions } from "express";
 import type { Request, Response } from "express";
 import {
   createPasswordResetRequest,
+  emailVerification,
   loginUser,
   logoutUser,
   refreshTokens,
   registerUser,
   resetPassword,
+  verifyEmail,
+  verifyUpdateEmail,
 } from "./auth.service.js";
 import type {
   RegisterInput,
   LoginInput,
   ForgetPasswordInput,
+  VerifyEmailInput,
 } from "@validation/auth.schema.js";
-import { log } from "console";
+import { UnauthenticatedError } from "@middleware/error/index.js";
 
 const CookieOptions: CookieOptions = {
   httpOnly: true,
@@ -120,9 +124,7 @@ export const forgotPasswordController = async (req: Request, res: Response) => {
 
 export const resetPasswordController = async (req: Request, res: Response) => {
   const { token, password } = (req as any).validatedBody;
-  const email = String(req.query.email ?? req.body.email ?? "").toLowerCase();
-  if (!email) throw new Error("Email is required");
-  await resetPassword(email, token, password);
+  await resetPassword(token, password);
   return res.status(200).json({
     status: "success",
     message: "Password updated. Please log in with your new password.",
@@ -130,7 +132,6 @@ export const resetPasswordController = async (req: Request, res: Response) => {
 };
 
 export const refreshTokenController = async (req: Request, res: Response) => {
-  console.log("Refresh token route hit");
   const reqRefreshToken = req.cookies["refresh-token"];
   if (!reqRefreshToken) {
     return res.status(401).json({ message: "No refresh token provided" });
@@ -138,7 +139,6 @@ export const refreshTokenController = async (req: Request, res: Response) => {
 
   const result = await refreshTokens(reqRefreshToken);
   const { accessToken, refreshToken, csrfToken } = result;
-  console.log("Refreshed tokens:", { accessToken, refreshToken, csrfToken });
   return res
     .status(200)
     .cookie("access-token", accessToken, {
@@ -155,6 +155,45 @@ export const refreshTokenController = async (req: Request, res: Response) => {
       maxAge: 30 * 24 * 60 * 60 * 1000,
     })
     .json({ message: "Tokens refreshed" });
+};
+
+export const emailVerificationController = async (
+  req: Request,
+  res: Response
+) => {
+  const userId = req.user?._id;
+
+  if (!userId) {
+    throw new UnauthenticatedError("Authentication required");
+  }
+  await emailVerification(userId);
+  return res.status(200).json({
+    message: "Verification email sent successfully",
+  });
+};
+
+export const verifyEmailController = async (req: Request, res: Response) => {
+  const { verificationToken } = (
+    req as unknown as { validatedBody?: VerifyEmailInput }
+  ).validatedBody!;
+
+  await verifyEmail(verificationToken);
+  return res.status(200).json({
+    message: "Email verified successfully",
+  });
+};
+
+export const verifyEmailChangeController = async (
+  req: Request,
+  res: Response
+) => {
+  const { verificationToken } = (
+    req as unknown as { validatedBody?: VerifyEmailInput }
+  ).validatedBody!;
+  await verifyUpdateEmail(verificationToken);
+  return res.status(200).json({
+    message: "Email change verified successfully",
+  });
 };
 
 export const logoutController = async (req: Request, res: Response) => {

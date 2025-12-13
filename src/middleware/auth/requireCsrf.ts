@@ -9,7 +9,6 @@ export const requireCsrf = async (
   try {
     const csrfCookie = req.cookies["csrf-token"];
     const csrfToken = req.headers["x-csrf-token"];
-    console.log("CSRF Cookie:", csrfCookie);
     if (!csrfToken || !csrfCookie) {
       const error = new Error("CSRF token missing") as any;
       error.statusCode = 403;
@@ -23,8 +22,6 @@ export const requireCsrf = async (
       .createHmac("sha256", process.env.CSRF_SECRET!)
       .update(csrfTokenValue)
       .digest("hex");
-      console.log("Signature:", expectedSignature,csrfTokenSignature);
-      console.log("Token Value:", csrfTokenValue,csrfToken);
     if (
       expectedSignature !== csrfTokenSignature ||
       csrfTokenValue !== csrfToken

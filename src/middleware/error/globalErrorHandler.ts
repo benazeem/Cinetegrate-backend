@@ -1,6 +1,6 @@
 // src/middleware/errorHandler.ts
 import { NextFunction, Request, Response } from "express";
-import { AppError } from "./AppError.js";
+import { AppError } from "./appError.js";
 
 const errorHandler = (
   err: Error,
@@ -17,10 +17,10 @@ const errorHandler = (
       message: err.message,
       code: err.code,
       details: err.details,
+      stack: err.stack,
     });
   }
 
-  // Unknown / unexpected error → 500
   return res.status(500).json({
     status: "error",
     message: "Internal Server Error",

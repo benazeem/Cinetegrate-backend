@@ -1,4 +1,13 @@
-import { UpdateAvatarType, validateBody } from "@validation/user.schema.js";
+import {
+  DeleteAllSessionsType,
+  UpdateAccountType,
+  UpdateAvatarType,
+  UpdateEmailType,
+  UpdateNotificationsType,
+  UpdatePasswordType,
+  UpdatePrivacySettingsType,
+  UpdateProfileType,
+} from "@validation/user.schema.js";
 import type { NextFunction, Request, Response } from "express";
 import {
   deleteAccount,
@@ -17,14 +26,14 @@ import {
   updatePassword,
   updatePrivacySettings,
   updateProfile,
-  verifyEmail,
 } from "./user.service.js";
+import { AccountStatus } from "constants/accountStatus.js";
+import { UnauthenticatedError } from "@middleware/error/index.js";
 
 export const getProfileController = async (req: Request, res: Response) => {
   const userId = req.user?._id;
-  console.log("getProfileController userId:", userId);
   if (!userId) {
-    throw new Error("User ID not found in request");
+    throw new UnauthenticatedError("Authentication required");
   }
   const user = await getProfile(userId);
 
@@ -44,36 +53,28 @@ export const getProfileController = async (req: Request, res: Response) => {
 
 export const updateProfileController = async (req: Request, res: Response) => {
   const userId = req.user?._id;
-  const updateData = req.body;
+  const updateData = (req as unknown as { validatedBody?: UpdateProfileType })
+    .validatedBody!;
   if (!userId) {
-    throw new Error("User ID not found in request");
+    throw new UnauthenticatedError("Authentication required");
   }
+
   const updatedUser = await updateProfile(userId, updateData);
 
-  return res.status(200).json({
-    id: updatedUser._id,
-    email: updatedUser.email,
-    username: updatedUser.username,
-    displayName: updatedUser.displayName,
-    avatarUrl: updatedUser.avatarUrl,
-    bio: updatedUser.bio,
-    plan: updatedUser.plan,
-    emailVerified: updatedUser.emailVerified,
-    links: updatedUser.links,
-    usage: updatedUser.usage,
-  });
+  return res.status(200).json(updatedUser);
 };
 
 export const updateAvatarController = async (req: Request, res: Response) => {
   const userId = req.user?._id;
-  const avatarData = (
-    req.body as unknown as { validateBody?: UpdateAvatarType }
-  ).validateBody!;
+  const avatarData = (req as unknown as { validatedBody?: UpdateAvatarType })
+    .validatedBody!;
   if (!userId) {
     throw new Error(
       "Invariant violation: req.user is missing after auth middleware"
     );
   }
+
+  // Add Mullter or file upload handling logic here to get the avatar file data
 
   const updatedUser = await updateAvatar(userId, avatarData);
   return res.status(200).json(updatedUser);
@@ -150,7 +151,9 @@ export const updateNotificationsController = async (
   res: Response
 ) => {
   const userId = req.user?._id;
-  const notificationPrefs = req.body;
+  const notificationPrefs = (
+    req.body as unknown as { validatedBody?: UpdateNotificationsType }
+  ).validatedBody!;
   if (!userId) {
     throw new Error("User ID not found in request");
   }
@@ -168,7 +171,9 @@ export const updatePrivacySettingsController = async (
   res: Response
 ) => {
   const userId = req.user?._id;
-  const privacyPrefs = req.body;
+  const privacyPrefs = (
+    req.body as unknown as { validatedBody?: UpdatePrivacySettingsType }
+  ).validatedBody!;
   if (!userId) {
     return new Error("User ID not found in request");
   }
@@ -181,7 +186,9 @@ export const updatePrivacySettingsController = async (
 
 export const updatePasswordController = async (req: Request, res: Response) => {
   const userId = req.user?._id;
-  const { currentPassword, newPassword } = req.body;
+  const { currentPassword, newPassword } = (
+    req.body as unknown as { validatedBody?: UpdatePasswordType }
+  ).validatedBody!;
   if (!userId) {
     throw new Error("User ID not found in request");
   }
@@ -193,23 +200,15 @@ export const updatePasswordController = async (req: Request, res: Response) => {
 
 export const updateEmailController = async (req: Request, res: Response) => {
   const userId = req.user?._id;
-  const { newEmail } = req.body;
+  const { newEmail } = (req as unknown as { validatedBody?: UpdateEmailType })
+    .validatedBody!;
   if (!userId) {
-    throw new Error("User ID not found in request");
+    throw new UnauthenticatedError("Authentication required");
   }
-  const updatedUser = await updateEmail(userId, newEmail);
-  return res.status(200).json(updatedUser);
-};
-
-export const verifyEmailController = async (req: Request, res: Response) => {
-  const userId = req.user?._id;
-  const method: string = req.body.method;
-  if (!userId) {
-    throw new Error("User ID not found in request");
-  }
-  // Implementation for verifying email
-  const result = await verifyEmail(userId, method);
-  return res.status(200).json(result);
+  await updateEmail(userId, newEmail);
+  return res.status(200).json({
+    message: "Email update initiated. Please verify your new email address.",
+  });
 };
 
 export const deleteSessionController = async (req: Request, res: Response) => {
@@ -225,14 +224,18 @@ export const deleteSessionController = async (req: Request, res: Response) => {
       .json({ message: "Cannot delete current active session" });
   }
   await deleteSession(userId, sessionId);
-  return res.status(204).send();
+  return res.status(204).send({
+    message: "Session deleted successfully",
+  });
 };
 
 export const deleteAllSessionsController = async (
   req: Request,
   res: Response
 ) => {
-  const removeCurrent = req.body.removeCurrent || false;
+  const { removeCurrent } = (
+    req.body as unknown as { validatedBody?: DeleteAllSessionsType }
+  ).validatedBody!;
   const userId = req.user?._id;
   const currentSession = req.sessionId;
 
@@ -258,13 +261,17 @@ export const deleteAccountController = async (req: Request, res: Response) => {
 
 export const updateAccountController = async (req: Request, res: Response) => {
   const userId = req.user?._id;
-  const updateData = req.body;
+  const sessionId = req.sessionId;
+  const { accountStatus } = (
+    req.body as unknown as { validatedBody?: UpdateAccountType }
+  ).validatedBody!;
   if (!userId) {
     throw new Error("User ID not found in request");
   }
-  // Implementation for updating user account - the main thing her is to update accountStatus other than deleted
-
-  const updatedUser = await updateAccount(userId, updateData);
+  if (!sessionId) {
+    throw new Error("Session ID not found in request");
+  }
+  const updatedUser = await updateAccount(userId, accountStatus, sessionId);
 
   return res.status(200).json({
     message: "Account updated successfully",

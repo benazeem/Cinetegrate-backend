@@ -32,10 +32,9 @@ const registerSchema = z
       .regex(/^[a-z0-9\-_]+$/, {
         message:
           "Username may contain letters, numbers, dash and underscore only",
-      })
-      .optional(),
+      }),
 
-    displayName: z.string().trim().min(1).max(80).optional(),
+    displayName: z.string().trim().min(1).max(80),
   })
   .superRefine((data, ctx) => {
     if (data.password !== data.confirmPassword) {
@@ -45,16 +44,17 @@ const registerSchema = z
         message: "Passwords do not match",
       });
     }
-  });
+  })
+  .strict();
 
 const loginSchema = z.object({
   email: z.email(),
   password: z.string().min(1, "Password is required"),
-});
+}).strict();
 
 const forgotPasswordSchema = z.object({
   email: z.string().trim().toLowerCase().email(),
-});
+}).strict();
 
 const resetPasswordSchema = z
   .object({
@@ -75,30 +75,36 @@ const resetPasswordSchema = z
         message: "Passwords do not match",
       });
     }
-  });
+  })
+  .strict();
+
+const verifyEmailSchema = z
+  .object({
+    verificationToken: z.string().min(10),
+  })
+  .strict();
 
 type LoginInput = z.infer<typeof loginSchema>;
 type RegisterInput = z.infer<typeof registerSchema>;
 type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 type ForgetPasswordInput = z.infer<typeof forgotPasswordSchema>;
+type VerifyEmailInput = z.infer<typeof verifyEmailSchema>;
 
 export type {
   LoginInput,
   RegisterInput,
   ResetPasswordInput,
   ForgetPasswordInput,
+  VerifyEmailInput,
 };
 export {
   loginSchema,
   registerSchema,
   resetPasswordSchema,
   forgotPasswordSchema,
+  verifyEmailSchema,
 };
 
-/**
- * Generic express middleware factory that validates req.body with a Zod schema.
- * On success attaches validated object to req.validatedBody
- */
 export function validateBody<T extends z.ZodTypeAny>(schema: T) {
   return async (req: Request, _res: Response, next: NextFunction) => {
     try {

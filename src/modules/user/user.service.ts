@@ -1,15 +1,22 @@
+import { ACCOUNT_STATUSES, AccountStatus } from "constants/accountStatus.js";
 import bcrypt from "bcrypt";
-import { InternalServerError } from "@middleware/error/index.js";
+import {
+  ConflictError,
+  InternalServerError,
+  NotFoundError,
+} from "@middleware/error/index.js";
 import { Session, SessionModel } from "@models/Session.js";
 import { type User, UserModel } from "@models/User.js";
 import { returnUserData } from "@utils/returnUserData.js";
 import { UpdateAvatarType } from "@validation/user.schema.js";
-import { ObjectIdSchemaDefinition } from "mongoose";
+import mongoose, { ObjectIdSchemaDefinition } from "mongoose";
+import { generateVerificationToken, verifyToken } from "@utils/tokens.js";
+import transporter from "config/mail.js";
+import { verifyUpdatedEmailTemplate } from "./email/templlate/verifyUpdatedEmail.js";
 
 export const getProfile = async (
   userId: ObjectIdSchemaDefinition
 ): Promise<User> => {
-  console.log("Fetching profile for userId:", userId);
   const user = await UserModel.findById(userId).select(
     "-passwordHash -emailVerificationToken -resetPasswordToken -createdAt -updatedAt"
   );
@@ -199,21 +206,55 @@ export const updateEmail = async (
   userId: ObjectIdSchemaDefinition,
   newEmail: string
 ): Promise<void> => {
-  // now here user will send a email to new email and that email will have to verify itself by clicking a link
-  // or can send mail to new and old email both for verification before changing the email in db
-  // better is if email is verified don't verify old email just send a notification to old email
-  // if email is not verified then ask user to verify old email before changing to new email
-};
-
-export const verifyEmail = async (
-  userId: ObjectIdSchemaDefinition,
-  method: string
-): Promise<void> => {
-  if (method === "sendVerificationLink") {
-    // send verification link to user's email
-  } else if (method === "verifyWithCode") {
-    // verify the code sent to user's email
+  const user = await UserModel.findById(userId);
+  if (!user) {
+    throw new NotFoundError("User not found");
   }
+  if (user.email === newEmail) {
+    throw new ConflictError("New email is the same as the current email");
+  }
+  const emailInUse = await UserModel.findOne({ email: newEmail });
+  if (emailInUse) {
+    throw new ConflictError("Email is already in use");
+  }
+  const token = generateVerificationToken();
+
+  const updateEmaillUrl = `${
+    process.env.APP_URL
+  }/verify-email-change?token=${encodeURIComponent(
+    token.raw
+  )}&userId=${encodeURIComponent(
+    user._id.toString()
+  )}&newEmail=${encodeURIComponent(newEmail)}`;
+
+  const { subject, text, html } = verifyUpdatedEmailTemplate(
+    user.displayName ?? user.username ?? null,
+    updateEmaillUrl
+  );
+
+  try {
+    await transporter.sendMail({
+      from: process.env.EMAIL_FROM,
+      to: newEmail,
+      subject: subject,
+      text: text,
+      html: html,
+    });
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    throw new InternalServerError(
+      "Failed to send verification email",
+      errorMessage
+    );
+  }
+  user.pendingEmailChange = {
+    newEmail: newEmail,
+    tokenHash: token.hash,
+    expiresAt: new Date(Date.now() + 3600 * 1000), // 1 hour
+    requestedAt: new Date(),
+    requestMethod: "self",
+  };
+  await user.save();
   return;
 };
 
@@ -237,7 +278,7 @@ export const deleteSession = async (
 export const deleteAllSessions = async (
   userId: ObjectIdSchemaDefinition,
   currentSessionId: string,
-  removeCurrent: boolean
+  removeCurrent: boolean | undefined
 ): Promise<void> => {
   const filter: any = { userId: userId };
   if (!removeCurrent) {
@@ -250,25 +291,86 @@ export const deleteAllSessions = async (
 export const deleteAccount = async (
   userId: ObjectIdSchemaDefinition
 ): Promise<void> => {
-  await UserModel.findByIdAndUpdate(
-    userId,
-    { deletedAt: new Date(), accountStatus: "deleted" },
-    { new: true }
-  );
-  await SessionModel.deleteMany({ userId: userId });
+  const session = await mongoose.startSession();
+  try {
+    session.startTransaction();
+    await UserModel.findByIdAndUpdate(
+      userId,
+      { deletedAt: new Date(), accountStatus: "deleted" },
+      { session }
+    );
+    await SessionModel.deleteMany({ userId }, { session });
+    await session.commitTransaction();
+  } catch (err) {
+    await session.abortTransaction();
+    throw err;
+  } finally {
+    session.endSession();
+  }
   return;
 };
 
 export const updateAccount = async (
   userId: ObjectIdSchemaDefinition,
-  updateData: Partial<User>
+  updateData: AccountStatus,
+  currentSessionId: string
 ): Promise<Partial<User>> => {
-  const user = await UserModel.findByIdAndUpdate(userId, updateData, {
-    new: true,
-  });
+  const user = await UserModel.findById(userId);
   if (!user) {
     throw new Error("User not found");
   }
-  const resUser = returnUserData(user, "profile");
-  return resUser;
+  const latestStatusEvent = await UserModel.aggregate([
+    { $match: { _id: userId } },
+    { $unwind: "$changeHistory" },
+    { $match: { "changeHistory.field": "accountStatus" } },
+    { $sort: { "changeHistory.at": -1 } },
+    { $limit: 1 },
+    { $replaceRoot: { newRoot: "$changeHistory" } },
+  ]);
+  let updatedUser;
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    if (
+      user.role === "user" &&
+      updateData !== "disabled" &&
+      updateData !== "active"
+    ) {
+      throw new Error("Only admin can do this operation");
+    } else if (
+      user.accountStatus === "disabled" &&
+      latestStatusEvent[0].via !== "user" &&
+      updateData === "active"
+    ) {
+      throw new Error(
+        "Disabled by admin, account can only be activated by admin"
+      );
+    } else {
+      updatedUser = await UserModel.findByIdAndUpdate(
+        userId,
+        { accountStatus: updateData },
+        { new: true, session }
+      );
+
+      await SessionModel.deleteMany(
+        {
+          userId: user._id,
+          sessionId: { $ne: currentSessionId },
+        },
+        { session }
+      );
+    }
+    await session.commitTransaction();
+    if (!updatedUser) {
+      throw new Error("User not found after update");
+    }
+    const resUser = returnUserData(updatedUser, "profile");
+    return resUser;
+  } catch (err) {
+    await session.abortTransaction();
+    throw err;
+  }
+  finally {
+    session.endSession();
+  }
 };

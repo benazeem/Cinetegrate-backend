@@ -1,15 +1,18 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
+import mongoose, { ObjectIdSchemaDefinition } from "mongoose";
 import { UserModel, type User } from "@models/User.js";
 import { SessionModel, type Session } from "@models/Session.js";
 import {
   generateAccessToken,
   generateCsrfToken,
   generateRefreshToken,
-  generateResetToken,
+  generateVerificationToken,
+  hashToken,
+  verifyToken,
 } from "@utils/tokens.js";
-import transporter from "@utils/mail.js";
+import transporter from "config/mail.js";
 import type {
   LoginInput,
   RegisterInput,
@@ -17,6 +20,17 @@ import type {
 } from "@validation/auth.schema.js";
 import { getIpInfo } from "@utils/getIpInfo.js";
 import { parseUserAgent } from "@utils/parseUserAgent.js";
+import { resetPasswordTemplate } from "./emails/templates/resetPassword.js";
+import { createUsername } from "@utils/createUsername.js";
+import { newAccountTemplate } from "./emails/templates/newAccount.js";
+import {
+  ConflictError,
+  InternalServerError,
+  NotFoundError,
+  UnauthenticatedError,
+} from "@middleware/error/index.js";
+import { emailVerificationTemplate } from "./emails/templates/emailVerification.js";
+import { passwordChangedNotificationTemplate } from "./emails/passwordChangedNotification.js";
 
 type LoginInputWithMeta = LoginInput & {
   userAgent: string;
@@ -54,46 +68,32 @@ export async function registerUser(
   input: RegisterInputWithMeta
 ): Promise<RegisterOutput> {
   const { email, password, displayName, username, userAgent, ip } = input;
-
   // Check if email exists
   const existing = await UserModel.findOne({ email });
   if (existing) {
-    throw new Error("Email already registered");
+    throw new ConflictError("Email already registered");
   }
   const usernameExist = await UserModel.findOne({ username });
   if (usernameExist) {
-    throw new Error("Username already exists");
+    throw new ConflictError("Username already exists");
   }
-
-  const generateusername = async (): Promise<string> => {
-    const newUsername = (
-      email.split("@")[0] + crypto.randomBytes(2).toString(`hex`)
-    ).toLowerCase();
-    const usernameExists = await UserModel.findOne({ username: newUsername });
-    if (usernameExists) {
-      generateusername();
-    }
-    return newUsername;
-  };
-
   // Metadata
   const ipData: any = await getIpInfo(ip as string);
   const userAgentInfo = parseUserAgent(userAgent);
 
-  // Hash password
   const passwordHash = await bcrypt.hash(password, 10);
 
-  // Create user
   const user = await UserModel.create({
     email,
     passwordHash,
-    username: username ? username.toLowerCase() : `${await generateusername()}`,
+    username: username
+      ? username.toLowerCase()
+      : `${await createUsername(email)}`,
     displayName: displayName ?? email.split("@")[0],
   });
 
   const sessionId: string = crypto.randomBytes(32).toString("hex");
-
-  const session = await SessionModel.create({
+  await SessionModel.create({
     sessionId,
     userId: user._id,
     userAgent,
@@ -116,7 +116,24 @@ export async function registerUser(
   const accessToken = generateAccessToken(user._id, sessionId);
   const refreshToken = generateRefreshToken(user._id, sessionId);
   const csrfToken = generateCsrfToken();
-
+  const { subject, text, html } = newAccountTemplate(
+    user.displayName || user.username || user.email.split("@")[0]
+  );
+  try {
+    transporter.sendMail({
+      from: process.env.EMAIL_FROM,
+      to: email,
+      subject,
+      text,
+      html,
+    });
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    throw new InternalServerError(
+      "Failed to send new account email",
+      errorMessage
+    );
+  }
   return { user, accessToken, refreshToken, csrfToken };
 }
 
@@ -127,12 +144,12 @@ export async function loginUser(
 
   const user = await UserModel.findOne({ email }).select("+passwordHash");
   if (!user) {
-    throw new Error("Email or Password does not match!");
+    throw new UnauthenticatedError("Email or Password does not match!");
   }
 
   const passedTest = await bcrypt.compare(password, user.passwordHash);
   if (!passedTest) {
-    throw new Error("Email or Password does not match!");
+    throw new UnauthenticatedError("Email or Password does not match!");
   }
 
   const ipData: any = await getIpInfo(ip as string);
@@ -169,92 +186,101 @@ export async function createPasswordResetRequest(email: string) {
   const normalized = email.trim().toLowerCase();
   const user = await UserModel.findOne({ email: normalized });
 
-  if (!user) return;
+  if (!user) {
+    return;
+  }
 
-  // generate token and hash
-  const { raw, hash } = generateResetToken();
-
-  // set expiry
+  const { raw, hash } = generateVerificationToken();
   const expiresAt = new Date(Date.now() + RESET_EXP_MIN * 60 * 1000);
 
   user.passwordReset = { tokenHash: hash, expiresAt, requestedAt: new Date() };
   await user.save();
 
-  // Build reset link - frontend route will accept token and show reset form
   const resetUrl = `${
     process.env.APP_URL
   }/auth/reset-password?token=${encodeURIComponent(
     raw
   )}&email=${encodeURIComponent(user.email)}`;
 
-  // Send email (HTML + plain text)
-  await transporter.sendMail({
-    from: process.env.EMAIL_FROM,
-    to: user.email,
-    subject: "Reset your Cinetegrate password",
-    text: `Reset your password: ${resetUrl}\n\nThis link expires in ${RESET_EXP_MIN} minutes.`,
-    html: `
-      <p>Hi ${user.displayName ?? ""},</p>
-      <p>You requested a password reset. Click the link below to create a new password. This link expires in ${RESET_EXP_MIN} minutes.</p>
-      <p><a href="${resetUrl}">Reset password</a></p>
-      <p>If you did not request this, ignore this email.</p>
-    `,
-  });
+  const { subject, text, html } = resetPasswordTemplate(
+    user.displayName || user.username || user.email.split("@")[0],
+    resetUrl,
+    RESET_EXP_MIN
+  );
+
+  try {
+    await transporter.sendMail({
+      from: process.env.EMAIL_FROM,
+      to: user.email,
+      subject,
+      text,
+      html,
+    });
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    throw new InternalServerError(
+      "Failed to send password reset email",
+      errorMessage
+    );
+  }
 }
 
-export async function resetPassword(
-  email: string,
-  rawToken: string,
-  newPassword: string
-) {
-  const user = await UserModel.findOne({ email: email.trim().toLowerCase() });
+export async function resetPassword(rawToken: string, newPassword: string) {
+  const hash = hashToken(rawToken);
+  const user = await UserModel.findOne({
+    "passwordReset.tokenHash": hash,
+  }).select("+passwordReset +passwordHash");
   if (
     !user ||
     !user.passwordReset?.tokenHash ||
     !user.passwordReset.expiresAt
   ) {
-    throw new Error("Invalid or expired token"); // generic message OK
+    throw new ConflictError("Invalid or expired token"); // generic message OK
   }
-
-  // check expiry
   if (user.passwordReset.expiresAt.getTime() < Date.now()) {
     user.passwordReset = undefined;
     await user.save();
-    throw new Error("Invalid or expired token");
+    throw new ConflictError("Invalid or expired token");
   }
 
-  // hash provided token and compare (use constant time compare)
-  const providedHash = crypto
-    .createHash("sha256")
-    .update(rawToken)
-    .digest("hex");
-  const tokenHashBuffer = Buffer.from(user.passwordReset.tokenHash, "hex");
-  const providedHashBuffer = Buffer.from(providedHash, "hex");
-
-  // prevent length issues
-  if (
-    tokenHashBuffer.length !== providedHashBuffer.length ||
-    !crypto.timingSafeEqual(tokenHashBuffer, providedHashBuffer)
-  ) {
-    throw new Error("Invalid or expired token");
+  const isValid = verifyToken(rawToken, user.passwordReset.tokenHash);
+  if (!isValid) {
+    throw new ConflictError("Invalid or expired token");
   }
-
-  // Good — set new password
   const hashedPassword = await bcrypt.hash(newPassword, 10);
-  user.passwordHash = hashedPassword;
-  user.passwordReset = undefined;
-  await user.save();
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    user.passwordHash = hashedPassword;
+    user.passwordReset = undefined;
+    await user.save({ session });
+    await SessionModel.deleteMany({ userId: user._id }, { session });
+  } catch (err) {
+    await session.abortTransaction();
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    throw new InternalServerError("Failed to reset password", errorMessage);
+  } finally {
+    session.endSession();
+  }
 
-  await SessionModel.deleteMany({ userId: user._id });
-
-  // Optionally email the user notifying password change
-  await transporter.sendMail({
-    from: process.env.EMAIL_FROM,
-    to: user.email,
-    subject: "Your password was changed",
-    text: `Your password was changed. If you did not do this, please contact support immediately.`,
-  });
-
+  const { subject, text, html } = passwordChangedNotificationTemplate(
+    user.displayName || user.username || null
+  );
+  try {
+    await transporter.sendMail({
+      from: process.env.EMAIL_FROM,
+      to: user.email,
+      subject: subject,
+      text: text,
+      html: html,
+    });
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    throw new InternalServerError(
+      "Failed to send password changed notification email",
+      errorMessage
+    );
+  }
   return;
 }
 
@@ -268,7 +294,7 @@ export async function refreshTokens(
       sessionId: string;
     };
   } catch (err) {
-    throw new Error("Invalid refresh token");
+    throw new UnauthenticatedError("Authentication failed");
   }
 
   const user = await UserModel.findOne({
@@ -280,7 +306,7 @@ export async function refreshTokens(
   });
 
   if (!decoded || !user || !session || session.revokedAt)
-    throw new Error("Invalid refresh token");
+    throw new UnauthenticatedError("Authentication failed");
 
   // ✅ update lastUsedAt for this session
   session.lastUsedAt = new Date();
@@ -292,6 +318,139 @@ export async function refreshTokens(
   return { accessToken, refreshToken: newRefreshToken, csrfToken };
 }
 
+export async function emailVerification(
+  userId: ObjectIdSchemaDefinition
+): Promise<void> {
+  const user = await UserModel.findById(userId);
+  if (!user) {
+    throw new NotFoundError("User not found");
+  }
+  if (user.emailVerified) {
+    throw new ConflictError("Email is already verified");
+  }
+  const token = generateVerificationToken();
+
+  const verifyEmailUrl = `${
+    process.env.APP_URL
+  }/verify-email?token=${encodeURIComponent(token.raw)}`;
+
+  const { subject, text, html } = emailVerificationTemplate(
+    user.displayName ?? user.username ?? null,
+    verifyEmailUrl
+  );
+  user.emailVerification = {
+    tokenHash: token.hash,
+    expiresAt: new Date(Date.now() + 3600 * 1000), // 1 hour
+    requestedAt: new Date(),
+  };
+  await user.save();
+  try {
+    await transporter.sendMail({
+      from: process.env.EMAIL_FROM,
+      to: user.email,
+      subject: subject,
+      text: text,
+      html: html,
+    });
+  } catch (err) {
+    throw new InternalServerError("Failed to send verification email");
+  }
+  return;
+}
+
+export async function verifyEmail(verificationToken: string): Promise<void> {
+  const hash = hashToken(verificationToken);
+  const user = await UserModel.findOne({
+    "emailVerification.tokenHash": hash,
+  }).select("+emailVerification");
+  if (!user) {
+    return;
+  }
+
+  if (
+    !user.emailVerification ||
+    !user.emailVerification.tokenHash ||
+    !user.emailVerification.expiresAt ||
+    user.emailVerification.expiresAt!.getTime() < Date.now()
+  ) {
+    user.emailVerification = undefined;
+    await user.save();
+    throw new ConflictError("Invalid or expired verification token");
+  }
+  const isValid = verifyToken(
+    verificationToken,
+    user.emailVerification.tokenHash
+  );
+  if (!isValid) {
+    throw new ConflictError("Invalid or expired verification token");
+  }
+  user.emailVerified = true;
+  user.emailVerification = undefined;
+  await user.save();
+  return;
+}
+
+export async function verifyUpdateEmail(
+  verificationToken: string
+): Promise<void> {
+  const hash = hashToken(verificationToken);
+  const user = await UserModel.findOne({
+    "pendingEmailChange.tokenHash": hash,
+  }).select("+pendingEmailChange +changeHistory");
+  if (!user) {
+   return;
+  }
+  if (
+    !user.pendingEmailChange ||
+    !user.pendingEmailChange.expiresAt ||
+    user.pendingEmailChange.expiresAt!.getTime() < Date.now() ||
+    !user.pendingEmailChange.tokenHash ||
+    !user.pendingEmailChange.newEmail
+  ) {
+    user.pendingEmailChange = undefined;
+    await user.save();
+    throw new ConflictError("Invalid or expired verification token");
+  }
+  const isValid = verifyToken(
+    verificationToken,
+    user.pendingEmailChange.tokenHash
+  );
+  if (!isValid) {
+    throw new ConflictError("Invalid or expired verification token");
+  }
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    user.changeHistory.push({
+      field: "email",
+      from: user.email,
+      to: user.pendingEmailChange.newEmail,
+      by: user._id,
+      reason: "User requested email change",
+      at: new Date(),
+      via: "user",
+    });
+    user.email = user.pendingEmailChange.newEmail;
+    user.emailVerified = true;
+    user.pendingEmailChange = undefined;
+    await user.save({ session });
+    await SessionModel.deleteMany({ userId: user._id }, { session });
+    await session.commitTransaction();
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new InternalServerError(
+      "Failed to verify updated email",
+      errorMessage
+    );
+  } finally {
+    session.endSession();
+  }
+
+  return;
+}
+
 export async function logoutUser(refreshToken: string) {
   let decoded;
   try {
@@ -300,15 +459,17 @@ export async function logoutUser(refreshToken: string) {
       sessionId: string;
     };
   } catch (err) {
-    throw new Error("Invalid refresh token");
+    throw new UnauthenticatedError("Authentication failed");
   }
   const session = await SessionModel.findOne({
     sessionId: decoded.sessionId,
     userId: decoded.userId,
   });
-  if (session && !session.revokedAt) {
-    session.revokedAt = new Date();
-    await session.save();
+  if (!session) {
+    throw new NotFoundError("Session not found");
   }
+  session.revokedAt = new Date();
+  await session.save();
+
   return;
 }

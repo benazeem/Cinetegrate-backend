@@ -3,6 +3,10 @@ import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { UserModel } from "@models/User.js";
 import { SessionModel } from "@models/Session.js";
+import {
+  NotFoundError,
+  UnauthenticatedError,
+} from "@middleware/error/index.js";
 
 export const requireAuth = async (
   req: Request,
@@ -10,12 +14,10 @@ export const requireAuth = async (
   next: NextFunction
 ) => {
   try {
-    const accessToken = req.cookies["access-token"];
-
-    console.log(req.cookies);
+    const accessToken = req.cookies["access-token"]; 
 
     if (!accessToken) {
-      return res.status(401).json({ message: "No access token provided" });
+      throw new UnauthenticatedError("user not authenticated, no access token found");
     }
 
     let decoded;
@@ -25,7 +27,7 @@ export const requireAuth = async (
         sessionId: string;
       };
     } catch (err) {
-      return res.status(401).json({ message: "Invalid or expired token" });
+      throw new UnauthenticatedError("Invalid or expired token");
     }
 
     // find user with this session
@@ -34,7 +36,7 @@ export const requireAuth = async (
     });
 
     if (!user) {
-      return res.status(401).json({ message: "User not found or invalid" });
+      throw new NotFoundError("User not found");
     }
 
     const session = await SessionModel.findOne({
@@ -43,12 +45,12 @@ export const requireAuth = async (
     });
 
     if (!session || session.revokedAt) {
-      return res.status(401).json({ message: "Session revoked or not found" });
+      throw new UnauthenticatedError("Session revoked or not found");
     }
 
     // ✅ update lastUsedAt for this session
     const now = Date.now();
-    const last = session.lastUsedAt?.getTime() ?? 0; 
+    const last = session.lastUsedAt?.getTime() ?? 0;
     // Update only if old enough (e.g., 5 minutes)
     if (now - last > 5 * 60 * 1000) {
       session.lastUsedAt = new Date();
@@ -58,8 +60,8 @@ export const requireAuth = async (
     // attach user + sessionId to request
     req.user = user;
     req.sessionId = decoded.sessionId;
-    next();
+    return next();
   } catch (err) {
-    new Error("Authentication middleware error");
+    next(err);
   }
 };

@@ -1,3 +1,4 @@
+import { ACCOUNT_STATUSES } from "constants/accountStatus.js";
 import {
   Schema,
   model,
@@ -5,7 +6,7 @@ import {
   type HydratedDocument,
 } from "mongoose";
 
-const passwordResetSchema = new Schema(
+const ResetSchema = new Schema(
   {
     tokenHash: { type: String },
     expiresAt: { type: Date },
@@ -13,6 +14,44 @@ const passwordResetSchema = new Schema(
   },
   { _id: false }
 );
+
+const UpdateEmailSchema = new Schema(
+  {
+    newEmail: { type: String, trim: true, lowercase: true },
+    tokenHash: { type: String },
+    expiresAt: { type: Date },
+    requestedAt: { type: Date },
+    requestMethod: { type: String }, // "self" | "oauth"
+  },
+  { _id: false }
+);
+
+const changeMetaSchema = new Schema(
+  {
+    field: {
+      type: String,
+      required: true,
+      enum: ["email", "password", "username", "accountStatus", "displayName"],
+    },
+
+    from: { type: Schema.Types.Mixed, default: null }, // previous value
+    to: { type: Schema.Types.Mixed, default: null }, // new value
+
+    by: { type: Schema.Types.ObjectId, ref: "User", required: true },
+
+    reason: { type: String, maxlength: 300, default: null },
+
+    at: { type: Date, default: Date.now },
+
+    via: {
+      type: String,
+      enum: ["user", "admin", "system"],
+      required: true,
+    },
+  },
+  { _id: false }
+);
+
 /**
  * Subdocument: OAuth / social providers (Google, GitHub, etc.)
  */
@@ -191,8 +230,8 @@ const userSchema = new Schema(
     },
     // Tokens (not selected by default)
     passwordReset: {
-      type: passwordResetSchema,
-      select: false, // ✅ now it's an option on the field "passwordReset"
+      type: ResetSchema,
+      select: false,
     },
     // OAuth providers (Google, GitHub, Meta, etc.)
     oauthProviders: {
@@ -210,16 +249,31 @@ const userSchema = new Schema(
       type: Boolean,
       default: false,
     },
+    emailVerification: {
+      type: ResetSchema,
+      select: false,
+    },
+    emailChangeAttempts: {
+      type: Number,
+      default: 0,
+    },
+    pendingEmailChange: {
+      type: UpdateEmailSchema,
+      select: false,
+    },
     phoneVerified: {
       type: Boolean,
       default: false,
     },
 
     // Account Status
-    accountStatus: {
-      type: String,
-      enum: ["active", "suspended", "banned", "deleted"],
-      default: "active",
+
+    accountStatus: { type: String, enum: ACCOUNT_STATUSES, default: "active" },
+
+    changeHistory: {
+      type: [changeMetaSchema],
+      default: [],
+      select: false,
     },
 
     // Billing

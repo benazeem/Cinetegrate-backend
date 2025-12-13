@@ -1,86 +1,94 @@
 // src/errors/index.ts
-import { AppError } from "./AppError.js";
+import { AppError } from "./appError.js";
+import { ERROR_CODES } from "./errorCodes.js";
 
 // 400 – Bad Request
 export class BadRequestError extends AppError {
   constructor(message = "Bad request", details?: any) {
-    super(message, 400, "BAD_REQUEST", details);
+    super(message, 400, ERROR_CODES.BAD_REQUEST, details);
   }
 }
 
-// 401 – Unauthorized (missing/invalid auth)
+// 401 – Unauthenticated (invalid or missing credentials)
+export class UnauthenticatedError extends AppError {
+  constructor(message = "Invalid credentials", details?: any) {
+    super(message, 401, ERROR_CODES.UNAUTHENTICATED, details);
+  }
+}
+
+// 403 – User authenticated, but not allowed
 export class UnauthorizedError extends AppError {
   constructor(message = "Unauthorized", details?: any) {
-    super(message, 401, "UNAUTHORIZED", details);
+    super(message, 403, ERROR_CODES.UNAUTHORIZED, details);
   }
 }
 
-// 403 – Forbidden (has auth but no permission)
+// Explicit permission failure
 export class ForbiddenError extends AppError {
   constructor(message = "Forbidden", details?: any) {
-    super(message, 403, "FORBIDDEN", details);
+    super(message, 403, ERROR_CODES.FORBIDDEN, details);
   }
 }
 
-// 404 – Not Found
+// 404 – Resource not found
 export class NotFoundError extends AppError {
   constructor(message = "Resource not found", details?: any) {
-    super(message, 404, "NOT_FOUND", details);
+    super(message, 404, ERROR_CODES.NOT_FOUND, details);
   }
 }
 
-// 405 – Method Not Allowed
+// 405 – Method not allowed
 export class MethodNotAllowedError extends AppError {
   constructor(message = "Method not allowed", details?: any) {
-    super(message, 405, "METHOD_NOT_ALLOWED", details);
+    super(message, 405, ERROR_CODES.METHOD_NOT_ALLOWED, details);
   }
 }
 
-// 409 – Conflict (duplicate email, name, state conflict)
+// 409 – Conflict (duplicate email, invalid state change, etc.)
 export class ConflictError extends AppError {
   constructor(message = "Conflict", details?: any) {
-    super(message, 409, "CONFLICT", details);
+    super(message, 409, ERROR_CODES.CONFLICT, details);
   }
 }
 
-// 410 – Gone (resource was deleted)
+// 410 – Resource permanently gone
 export class GoneError extends AppError {
-  constructor(message = "Resource is gone", details?: any) {
-    super(message, 410, "GONE", details);
+  constructor(message = "Resource gone", details?: any) {
+    super(message, 410, ERROR_CODES.GONE, details);
   }
 }
 
-// 422 – Unprocessable Entity (validation errors)
+// 422 – Validation errors
 export class UnprocessableEntityError extends AppError {
-  constructor(message = "Unprocessable entity", details?: any) {
-    super(message, 422, "UNPROCESSABLE_ENTITY", details);
+  constructor(message = "Validation error", details?: any) {
+    super(message, 422, ERROR_CODES.VALIDATION_ERROR, details);
   }
 }
 
-// 429 – Too Many Requests (rate limits)
+// 429 – Rate limit exceeded
 export class TooManyRequestsError extends AppError {
   constructor(message = "Too many requests", details?: any) {
-    super(message, 429, "TOO_MANY_REQUESTS", details);
+    super(message, 429, ERROR_CODES.TOO_MANY_REQUESTS, details);
   }
 }
 
-// 500 – Internal Server Error
+// 500 – Unexpected backend failure
 export class InternalServerError extends AppError {
   constructor(message = "Internal server error", details?: any) {
-    super(message, 500, "INTERNAL_SERVER_ERROR", details);
+    super(message, 500, ERROR_CODES.INTERNAL_ERROR, details);
   }
 }
 
-// 503 – Service Unavailable (DB down, queue down, payment API down)
+// 503 – External service or DB unavailable
 export class ServiceUnavailableError extends AppError {
   constructor(message = "Service unavailable", details?: any) {
-    super(message, 503, "SERVICE_UNAVAILABLE", details);
+    super(message, 503, ERROR_CODES.SERVICE_UNAVAILABLE, details);
   }
 }
 
-// 504 – Gateway Timeout (video API timeout, external API slow)
+// 504 – External API timeout
 export class GatewayTimeoutError extends AppError {
   constructor(message = "Gateway timeout", details?: any) {
-    super(message, 504, "GATEWAY_TIMEOUT", details);
+    super(message, 504, ERROR_CODES.GATEWAY_TIMEOUT, details);
   }
 }

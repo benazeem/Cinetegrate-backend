@@ -15,13 +15,24 @@ import {
   updatePrivacySettingsController,
   updatePasswordController,
   updateEmailController,
-  verifyEmailController,
   deleteSessionController,
   deleteAllSessionsController,
   deleteAccountController,
-  updateAccountController
+  updateAccountController,
 } from "./user.controller.js";
-import { updateProfileSchema, validateBody } from "@validation/user.schema.js";
+import {
+  deleteAllSessionsSchema,
+  deleteSessionParamsSchema,
+  updateAccountSchema,
+  updateAvatarSchema,
+  updateEmailSchema,
+  updateNotificationsSchema,
+  updatePasswordSchema,
+  updatePrivacySettingsSchema,
+  updateProfileSchema,
+  validateBody,
+  validateParams,
+} from "@validation/user.schema.js";
 
 const router = Router();
 
@@ -38,25 +49,50 @@ router.patch(
   validateBody(updateProfileSchema),
   asyncHandler(updateProfileController)
 );
-router.patch("/profile/avatar", asyncHandler(updateAvatarController));
+router.patch(
+  "/profile/avatar",
+  validateBody(updateAvatarSchema),
+  asyncHandler(updateAvatarController)
+);
 router.delete("/profile/avatar", asyncHandler(deleteAvatarController));
 router.patch(
   "/settings/notifications",
+  validateBody(updateNotificationsSchema),
   asyncHandler(updateNotificationsController)
 );
 router.patch(
   "/settings/privacy",
+  validateBody(updatePrivacySettingsSchema),
   asyncHandler(updatePrivacySettingsController)
 );
-router.patch("/security/password", asyncHandler(updatePasswordController));
-router.patch("/security/email", asyncHandler(updateEmailController));
-router.post("/security/email/verify", asyncHandler(verifyEmailController));
+router.patch(
+  "/security/password",
+  validateBody(updatePasswordSchema),
+  asyncHandler(updatePasswordController)
+);
+router.patch(
+  "/security/email",
+  validateBody(updateEmailSchema),
+  asyncHandler(updateEmailController)
+);
 
-router.delete("/sessions/:sessionId", asyncHandler(deleteSessionController));
-router.delete("/sessions", asyncHandler(deleteAllSessionsController));
+router.delete(
+  "/sessions/:sessionId",
+  validateBody(deleteAllSessionsSchema),
+  asyncHandler(deleteSessionController)
+);
+router.delete(
+  "/sessions",
+  validateParams(deleteSessionParamsSchema),
+  asyncHandler(deleteAllSessionsController)
+);
 // router.patch("/billing/plan", asyncHandler() ) to be done after payment integration
 
-router.delete("/account", asyncHandler(deleteAccountController) )
-router.patch("/account", asyncHandler(updateAccountController) )
+router.delete("/account", asyncHandler(deleteAccountController));
+router.patch(
+  "/account",
+  validateBody(updateAccountSchema),
+  asyncHandler(updateAccountController)
+);
 
 export default router;

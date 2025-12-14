@@ -14,6 +14,9 @@ export const ERROR_CODES = {
   CONFLICT: "conflict",
 
   GONE: "gone",
+  PAYLOAD_TOO_LARGE: "payload_too_large",
+
+  UNPROCESSABLE_ENTITY: "unprocessable_entity",
 
   VALIDATION_ERROR: "validation_error",
 

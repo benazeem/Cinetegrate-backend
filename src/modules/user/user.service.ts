@@ -2,13 +2,18 @@ import { ACCOUNT_STATUSES, AccountStatus } from "constants/accountStatus.js";
 import bcrypt from "bcrypt";
 import {
   ConflictError,
+  ForbiddenError,
   InternalServerError,
   NotFoundError,
 } from "@middleware/error/index.js";
 import { Session, SessionModel } from "@models/Session.js";
 import { type User, UserModel } from "@models/User.js";
 import { returnUserData } from "@utils/returnUserData.js";
-import { UpdateAvatarType } from "@validation/user.schema.js";
+import {
+  UpdateAvatarType,
+  UpdateNotificationsType,
+  UpdatePrivacySettingsType,
+} from "@validation/user.schema.js";
 import mongoose, { ObjectIdSchemaDefinition } from "mongoose";
 import { generateVerificationToken, verifyToken } from "@utils/tokens.js";
 import transporter from "config/mail.js";
@@ -21,7 +26,7 @@ export const getProfile = async (
     "-passwordHash -emailVerificationToken -resetPasswordToken -createdAt -updatedAt"
   );
   if (!user) {
-    throw new Error("User not found");
+    throw new NotFoundError("User not found");
   }
   return user;
 };
@@ -35,7 +40,7 @@ export const updateProfile = async (
   });
 
   if (!user) {
-    throw new Error("User not found");
+    throw new NotFoundError("User not found");
   }
   const resUser = returnUserData(user, "profile");
   return resUser;
@@ -43,17 +48,21 @@ export const updateProfile = async (
 
 export const updateAvatar = async (
   userId: ObjectIdSchemaDefinition,
-  avatarData: UpdateAvatarType
+  avatarData: Express.Multer.File
 ): Promise<Partial<User>> => {
-  // user will send a file not url so treat it here and store it in a location on cloud or locally localstack s3
-  const avatarUrl = `/uploads/avatars/${userId.toString()}/${Date.now()}_${avatarData}`;
+  const { filename, path } = avatarData;
+
+  //TODO: Add logic to move the file from temp to cloud storage like s3 or similar
+  // For now, we will just use the filename as is
+  const avatarUrl = `/uploads/avatars/${filename}`;
+
   const user = await UserModel.findByIdAndUpdate(
     userId,
     { avatarUrl: avatarUrl },
     { new: true }
   );
   if (!user) {
-    throw new Error("User not found");
+    throw new NotFoundError("User not found");
   }
   const resUser = returnUserData(user, "profile");
   return resUser;
@@ -62,14 +71,21 @@ export const updateAvatar = async (
 export const deleteAvatar = async (
   userId: ObjectIdSchemaDefinition
 ): Promise<void> => {
-  const user = await UserModel.findByIdAndUpdate(
+  const user = await UserModel.findById(userId);
+  if (!user) {
+    throw new NotFoundError("User not found");
+  }
+  const oldAvatarUrl = user.avatarUrl;
+  if (!oldAvatarUrl) {
+    return;
+  }
+  //TODO Add logic to delete the avatar file from storage if necessary
+
+  await UserModel.findByIdAndUpdate(
     userId,
     { $unset: { avatarUrl: "" } },
     { new: true }
   );
-  if (!user) {
-    throw new Error("User not found");
-  }
   return;
 };
 
@@ -93,7 +109,7 @@ export const getSecurity = async (
     "email phoneNumber passwordHash emailVerified phoneVerified lastPasswordChangeAt twoFactorEnabled oauthProviders"
   );
   if (!user) {
-    throw new Error("User not found");
+    throw new NotFoundError("User not found");
   }
   const resUser = returnUserData(user as User, "security");
   return resUser;
@@ -144,7 +160,7 @@ export const getBilling = async (
 ): Promise<Partial<User>> => {
   const user = await UserModel.findById(userId).select("plan billingInfo");
   if (!user) {
-    throw new Error("User not found");
+    throw new NotFoundError("User not found");
   }
   const resUser = returnUserData(user as User, "billing");
   return resUser;
@@ -152,15 +168,30 @@ export const getBilling = async (
 
 export const updateNotifications = async (
   userId: ObjectIdSchemaDefinition,
-  notificationPrefs: any
+  notificationPrefs: UpdateNotificationsType
 ): Promise<Partial<User>> => {
+  const update: Record<string, any> = {};
+
+  if (notificationPrefs.emailNotifications !== undefined) {
+    update["notificationPrefs.emailOnJobComplete"] =
+      notificationPrefs.emailNotifications;
+  }
+
+  if (notificationPrefs.pushNotifications !== undefined) {
+    update["notificationPrefs.inApp"] = notificationPrefs.pushNotifications;
+  }
+
+  if (notificationPrefs.newsletter !== undefined) {
+    update["notificationPrefs.marketingEmails"] = notificationPrefs.newsletter;
+  }
+
   const user = await UserModel.findByIdAndUpdate(
     userId,
-    { emailNotifications: notificationPrefs },
+    { $set: update },
     { new: true }
   );
   if (!user) {
-    throw new Error("User not found");
+    throw new NotFoundError("User not found");
   }
   const resUser = returnUserData(user as User, "settings");
   return resUser;
@@ -168,15 +199,30 @@ export const updateNotifications = async (
 
 export const updatePrivacySettings = async (
   userId: ObjectIdSchemaDefinition,
-  privacyPrefs: any
+  privacyPrefs: UpdatePrivacySettingsType
 ): Promise<Partial<User>> => {
+  const update: Record<string, any> = {};
+  if (privacyPrefs.profileVisibility !== undefined) {
+    update["privacyPrefs.profileVisibility"] = privacyPrefs.profileVisibility;
+  }
+  if (privacyPrefs.showEmailOnProfile !== undefined) {
+    update["privacyPrefs.showEmailOnProfile"] = privacyPrefs.showEmailOnProfile;
+  }
+  if (privacyPrefs.showLinksOnProfile !== undefined) {
+    update["privacyPrefs.showLinksOnProfile"] = privacyPrefs.showLinksOnProfile;
+  }
+  if (privacyPrefs.allowDiscoverability !== undefined) {
+    update["privacyPrefs.allowDiscoverability"] =
+      privacyPrefs.allowDiscoverability;
+  }
+
   const user = await UserModel.findByIdAndUpdate(
     userId,
-    { privacySettings: privacyPrefs },
+    { $set: update },
     { new: true }
   );
   if (!user) {
-    throw new Error("User not found");
+    throw new NotFoundError("User not found");
   }
   const resUser = returnUserData(user as User, "settings");
   return resUser;
@@ -187,17 +233,29 @@ export const updatePassword = async (
   currentPassword: string,
   newPassword: string
 ): Promise<void> => {
-  const user = await UserModel.findById(userId);
+  const user = await UserModel.findById(userId).select(
+    "+passwordHash +changeHistory"
+  );
   if (!user) {
-    throw new Error("User not found");
+    throw new NotFoundError("User not found");
   }
+
   const isMatch = await bcrypt.compare(currentPassword, user.passwordHash);
   if (!isMatch) {
-    throw new Error("Current password is incorrect");
+    throw new ConflictError("Current password is incorrect");
   }
   const hashedPassword = await bcrypt.hash(newPassword, 10);
   user.lastPasswordChangeAt = new Date();
   user.passwordHash = hashedPassword;
+  user.changeHistory.push({
+    field: "password",
+    by: user._id,
+    oldValue: "",
+    newValue: "",
+    reason: "User initiated password change",
+    at: new Date(),
+    via: "user",
+  });
   await user.save();
   return;
 };
@@ -268,7 +326,7 @@ export const deleteSession = async (
   });
 
   if (!session) {
-    throw new Error("Session not found");
+    throw new NotFoundError("Session not found");
   }
   session.revokedAt = new Date();
   await session.save();
@@ -296,7 +354,21 @@ export const deleteAccount = async (
     session.startTransaction();
     await UserModel.findByIdAndUpdate(
       userId,
-      { deletedAt: new Date(), accountStatus: "deleted" },
+      {
+        deletedAt: new Date(),
+        accountStatus: "deleted",
+        $push: {
+          changeHistory: {
+            field: "accountStatus",
+            from: "active",
+            to: "deleted",
+            by: userId,
+            reason: "User deleted account",
+            at: new Date(),
+            via: "user",
+          },
+        },
+      },
       { session }
     );
     await SessionModel.deleteMany({ userId }, { session });
@@ -315,9 +387,9 @@ export const updateAccount = async (
   updateData: AccountStatus,
   currentSessionId: string
 ): Promise<Partial<User>> => {
-  const user = await UserModel.findById(userId);
+  const user = await UserModel.findById(userId).select("+changeHistory +role");
   if (!user) {
-    throw new Error("User not found");
+    throw new NotFoundError("User not found");
   }
   const latestStatusEvent = await UserModel.aggregate([
     { $match: { _id: userId } },
@@ -328,6 +400,7 @@ export const updateAccount = async (
     { $replaceRoot: { newRoot: "$changeHistory" } },
   ]);
   let updatedUser;
+
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
@@ -336,19 +409,33 @@ export const updateAccount = async (
       updateData !== "disabled" &&
       updateData !== "active"
     ) {
-      throw new Error("Only admin can do this operation");
+      throw new ForbiddenError("Only admin can do this operation");
     } else if (
+      latestStatusEvent[0] &&
       user.accountStatus === "disabled" &&
       latestStatusEvent[0].via !== "user" &&
       updateData === "active"
     ) {
-      throw new Error(
+      throw new ForbiddenError(
         "Disabled by admin, account can only be activated by admin"
       );
     } else {
       updatedUser = await UserModel.findByIdAndUpdate(
         userId,
-        { accountStatus: updateData },
+        {
+          accountStatus: updateData,
+          $push: {
+            changeHistory: {
+              field: "accountStatus",
+              from: user.accountStatus,
+              to: updateData,
+              by: user._id,
+              reason: "Account status updated",
+              at: new Date(),
+              via: user.role,
+            },
+          },
+        },
         { new: true, session }
       );
 
@@ -362,15 +449,14 @@ export const updateAccount = async (
     }
     await session.commitTransaction();
     if (!updatedUser) {
-      throw new Error("User not found after update");
+      throw new NotFoundError("User not found");
     }
     const resUser = returnUserData(updatedUser, "profile");
     return resUser;
   } catch (err) {
     await session.abortTransaction();
     throw err;
-  }
-  finally {
+  } finally {
     session.endSession();
   }
 };

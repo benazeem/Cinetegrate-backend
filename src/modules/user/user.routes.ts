@@ -33,6 +33,7 @@ import {
   validateBody,
   validateParams,
 } from "@validation/user.schema.js";
+import { avatarUpload } from "@middleware/avatarUpload.js";
 
 const router = Router();
 
@@ -51,7 +52,7 @@ router.patch(
 );
 router.patch(
   "/profile/avatar",
-  validateBody(updateAvatarSchema),
+  avatarUpload,
   asyncHandler(updateAvatarController)
 );
 router.delete("/profile/avatar", asyncHandler(deleteAvatarController));
@@ -78,12 +79,12 @@ router.patch(
 
 router.delete(
   "/sessions/:sessionId",
-  validateBody(deleteAllSessionsSchema),
+  validateParams(deleteSessionParamsSchema),
   asyncHandler(deleteSessionController)
 );
 router.delete(
   "/sessions",
-  validateParams(deleteSessionParamsSchema),
+  validateBody(deleteAllSessionsSchema),
   asyncHandler(deleteAllSessionsController)
 );
 // router.patch("/billing/plan", asyncHandler() ) to be done after payment integration

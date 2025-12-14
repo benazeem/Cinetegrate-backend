@@ -31,7 +31,7 @@ const changeMetaSchema = new Schema(
     field: {
       type: String,
       required: true,
-      enum: ["email", "password", "username", "accountStatus", "displayName"],
+      enum: ["email", "password", "accountStatus"],
     },
 
     from: { type: Schema.Types.Mixed, default: null }, // previous value
@@ -292,13 +292,22 @@ const userSchema = new Schema(
     // Notification settings
     notificationPrefs: {
       type: notificationPrefsSchema,
-      default: () => ({}),
+      default: () => ({
+        emailOnJobComplete: true,
+        inApp: true,
+        marketingEmails: false,
+      }),
     },
 
     // Privacy prefs
     privacyPrefs: {
       type: privacyPrefsSchema,
-      default: () => ({}),
+      default: () => ({
+        profileVisibility: "private",
+        showEmailOnProfile: false,
+        showLinksOnProfile: true,
+        allowDiscoverability: true,
+      }),
     },
     // Legal / Terms
     termsAcceptedAt: { type: Date },

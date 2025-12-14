@@ -21,6 +21,7 @@ export const returnUserData = (user: User, type: UserReturnType) => {
         plan: user.plan,
         emailVerified: user.emailVerified,
         usage: user.usage,
+        accountStatus: user.accountStatus,
       };
 
     case "settings":
@@ -73,7 +74,7 @@ export const returnUserData = (user: User, type: UserReturnType) => {
         role: user.role,
         status: user.accountStatus, // enum: active, suspended, banned, deleted
         createdAt: user.createdAt,
-      }; 
+      };
     default:
       return {
         _id: user._id,

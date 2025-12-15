@@ -54,8 +54,9 @@ export const updateNotificationsSchema = z
 export const updatePrivacySettingsSchema = z
   .object({
     profileVisibility: z.enum(["public", "private", "unlisted"]).optional(),
-    showActivityStatus: z.boolean().optional(),
-    // extend as needed
+    showEmailOnProfile: z.boolean().optional(),
+    showLinksOnProfile: z.boolean().optional(),
+    allowDiscoverability: z.boolean().optional(),
   })
   .strict();
 

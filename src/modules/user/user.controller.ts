@@ -1,7 +1,7 @@
 import {
   DeleteAllSessionsType,
+  DeleteSessionParamsType,
   UpdateAccountType,
-  UpdateAvatarType,
   UpdateEmailType,
   UpdateNotificationsType,
   UpdatePasswordType,
@@ -28,7 +28,11 @@ import {
   updateProfile,
 } from "./user.service.js";
 import { AccountStatus } from "constants/accountStatus.js";
-import { UnauthenticatedError } from "@middleware/error/index.js";
+import {
+  BadRequestError,
+  NotFoundError,
+  UnauthenticatedError,
+} from "@middleware/error/index.js";
 
 export const getProfileController = async (req: Request, res: Response) => {
   const userId = req.user?._id;
@@ -66,20 +70,15 @@ export const updateProfileController = async (req: Request, res: Response) => {
 
 export const updateAvatarController = async (req: Request, res: Response) => {
   const userId = req.user?._id;
-  const avatarData = (req as unknown as { validatedBody?: UpdateAvatarType })
-    .validatedBody!;
+  const avatarData = req.file;
   if (!userId) {
-    throw new Error(
-      "Invariant violation: req.user is missing after auth middleware"
-    );
+    throw new UnauthenticatedError("Authentication required");
   }
-
-  // Add Mullter or file upload handling logic here to get the avatar file data
-
+  if (!avatarData) {
+    throw new BadRequestError("Avatar file not found");
+  }
   const updatedUser = await updateAvatar(userId, avatarData);
   return res.status(200).json(updatedUser);
-
-  // Implementation for updating user avatar
 };
 
 export const deleteAvatarController = async (
@@ -89,9 +88,7 @@ export const deleteAvatarController = async (
 ) => {
   const userId = req.user?._id;
   if (!userId) {
-    throw new Error(
-      "Invariant violation: req.user is missing after auth middleware"
-    );
+    throw new UnauthenticatedError("Authentication required");
   }
   await deleteAvatar(userId);
   return res.status(204).send({
@@ -102,9 +99,7 @@ export const deleteAvatarController = async (
 export const getSettingsController = async (req: Request, res: Response) => {
   const userId = req.user?._id;
   if (!userId) {
-    throw new Error(
-      "Invariant violation: req.user is missing after auth middleware"
-    );
+    throw new UnauthenticatedError("Authentication required");
   }
   const user = await getSettings(userId);
   return res.status(200).json(user);
@@ -113,9 +108,7 @@ export const getSettingsController = async (req: Request, res: Response) => {
 export const getSecurityController = async (req: Request, res: Response) => {
   const userId = req.user?._id;
   if (!userId) {
-    return new Error(
-      "Invariant violation: req.user is missing after auth middleware"
-    );
+    throw new UnauthenticatedError("Authentication required");
   }
   const user = await getSecurity(userId);
 
@@ -126,9 +119,7 @@ export const getSessionsController = async (req: Request, res: Response) => {
   const userId = req.user?._id;
   const sessionId = req.sessionId;
   if (!userId || !sessionId) {
-    throw new Error(
-      "Invariant violation: req.user is missing after auth middleware"
-    );
+    throw new UnauthenticatedError("Authentication required");
   }
   const sessions = await getSessions(userId, sessionId);
   return res.status(200).json(sessions);
@@ -137,9 +128,7 @@ export const getSessionsController = async (req: Request, res: Response) => {
 export const getBillingController = async (req: Request, res: Response) => {
   const userId = req.user?._id;
   if (!userId) {
-    throw new Error(
-      "Invariant violation: req.user is missing after auth middleware"
-    );
+    throw new UnauthenticatedError("Authentication required");
   }
 
   const billingInfo = await getBilling(userId);
@@ -152,10 +141,10 @@ export const updateNotificationsController = async (
 ) => {
   const userId = req.user?._id;
   const notificationPrefs = (
-    req.body as unknown as { validatedBody?: UpdateNotificationsType }
+    req as unknown as { validatedBody?: UpdateNotificationsType }
   ).validatedBody!;
   if (!userId) {
-    throw new Error("User ID not found in request");
+    throw new UnauthenticatedError("Authentication required");
   }
   // Assuming updateNotifications is a service function to update notification preferences
   const updatedUser = await updateNotifications(userId, notificationPrefs);
@@ -172,10 +161,10 @@ export const updatePrivacySettingsController = async (
 ) => {
   const userId = req.user?._id;
   const privacyPrefs = (
-    req.body as unknown as { validatedBody?: UpdatePrivacySettingsType }
+    req as unknown as { validatedBody?: UpdatePrivacySettingsType }
   ).validatedBody!;
   if (!userId) {
-    return new Error("User ID not found in request");
+    throw new UnauthenticatedError("Authentication required");
   }
   const updatedUser = await updatePrivacySettings(userId, privacyPrefs);
   return res.status(200).json({
@@ -187,11 +176,12 @@ export const updatePrivacySettingsController = async (
 export const updatePasswordController = async (req: Request, res: Response) => {
   const userId = req.user?._id;
   const { currentPassword, newPassword } = (
-    req.body as unknown as { validatedBody?: UpdatePasswordType }
+    req as unknown as { validatedBody?: UpdatePasswordType }
   ).validatedBody!;
   if (!userId) {
-    throw new Error("User ID not found in request");
+    throw new UnauthenticatedError("Authentication required");
   }
+  // TODO : Ask user if wanted to remove all sessions except current
   await updatePassword(userId, currentPassword, newPassword);
   return res.status(200).json({
     message: "Password updated successfully",
@@ -213,10 +203,12 @@ export const updateEmailController = async (req: Request, res: Response) => {
 
 export const deleteSessionController = async (req: Request, res: Response) => {
   const userId = req.user?._id;
-  const { sessionId } = req.params;
+  const { sessionId } = (
+    req as unknown as { validatedParams?: DeleteSessionParamsType }
+  ).validatedParams!;
   const currentSession = req.sessionId;
   if (!userId) {
-    throw new Error("User ID not found in request");
+    throw new UnauthenticatedError("Authentication required");
   }
   if (currentSession === sessionId) {
     return res
@@ -234,16 +226,16 @@ export const deleteAllSessionsController = async (
   res: Response
 ) => {
   const { removeCurrent } = (
-    req.body as unknown as { validatedBody?: DeleteAllSessionsType }
+    req as unknown as { validatedBody?: DeleteAllSessionsType }
   ).validatedBody!;
   const userId = req.user?._id;
   const currentSession = req.sessionId;
 
   if (!userId) {
-    throw new Error("User ID not found in request");
+    throw new UnauthenticatedError("Authentication required");
   }
   if (!currentSession) {
-    throw new Error("Session ID not found in request");
+    throw new UnauthenticatedError("Authentication required");
   }
   await deleteAllSessions(userId, currentSession, removeCurrent);
   return res.status(204).send();
@@ -252,7 +244,7 @@ export const deleteAllSessionsController = async (
 export const deleteAccountController = async (req: Request, res: Response) => {
   const userId = req.user?._id;
   if (!userId) {
-    throw new Error("User ID not found in request");
+    throw new UnauthenticatedError("Authentication required");
   }
   // Implementation for deleting user account
   await deleteAccount(userId);
@@ -263,13 +255,13 @@ export const updateAccountController = async (req: Request, res: Response) => {
   const userId = req.user?._id;
   const sessionId = req.sessionId;
   const { accountStatus } = (
-    req.body as unknown as { validatedBody?: UpdateAccountType }
+    req as unknown as { validatedBody?: UpdateAccountType }
   ).validatedBody!;
   if (!userId) {
-    throw new Error("User ID not found in request");
+    throw new UnauthenticatedError("Authentication required");
   }
   if (!sessionId) {
-    throw new Error("Session ID not found in request");
+    throw new UnauthenticatedError("Authentication required");
   }
   const updatedUser = await updateAccount(userId, accountStatus, sessionId);
 

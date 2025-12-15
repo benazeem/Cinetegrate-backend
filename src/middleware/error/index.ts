@@ -58,6 +58,12 @@ export class GoneError extends AppError {
   }
 }
 
+export class PayloadTooLargeError extends AppError {
+  constructor(message = "Payload too large", details?: any) {
+    super(message, 413, ERROR_CODES.PAYLOAD_TOO_LARGE, details);
+  }
+}
+
 // 422 – Validation errors
 export class UnprocessableEntityError extends AppError {
   constructor(message = "Validation error", details?: any) {

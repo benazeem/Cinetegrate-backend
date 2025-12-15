@@ -194,6 +194,13 @@ export async function createPasswordResetRequest(email: string) {
   const expiresAt = new Date(Date.now() + RESET_EXP_MIN * 60 * 1000);
 
   user.passwordReset = { tokenHash: hash, expiresAt, requestedAt: new Date() };
+  user.changeHistory.push({
+    field: "password",
+    by: user._id,
+    reason: "User requested password reset",
+    at: new Date(),
+    via: "user",
+  });
   await user.save();
 
   const resetUrl = `${
@@ -253,6 +260,16 @@ export async function resetPassword(rawToken: string, newPassword: string) {
   try {
     user.passwordHash = hashedPassword;
     user.passwordReset = undefined;
+    user.lastPasswordChangeAt = new Date();
+    user.changeHistory.push({
+      field: "password",
+      by: user._id,
+      from: "",
+      to: "",
+      reason: "User reset the password via password reset",
+      at: new Date(),
+      via: "user",
+    });
     await user.save({ session });
     await SessionModel.deleteMany({ userId: user._id }, { session });
   } catch (err) {
@@ -343,6 +360,13 @@ export async function emailVerification(
     expiresAt: new Date(Date.now() + 3600 * 1000), // 1 hour
     requestedAt: new Date(),
   };
+  user.changeHistory.push({
+    field: "email",
+    by: user._id,
+    reason: "User requested email verification",
+    at: new Date(),
+    via: "user",
+  });
   await user.save();
   try {
     await transporter.sendMail({
@@ -386,6 +410,13 @@ export async function verifyEmail(verificationToken: string): Promise<void> {
   }
   user.emailVerified = true;
   user.emailVerification = undefined;
+  user.changeHistory.push({
+    field: "email",
+    by: user._id,
+    reason: "User verified their email",
+    at: new Date(),
+    via: "user",
+  });
   await user.save();
   return;
 }
@@ -398,7 +429,7 @@ export async function verifyUpdateEmail(
     "pendingEmailChange.tokenHash": hash,
   }).select("+pendingEmailChange +changeHistory");
   if (!user) {
-   return;
+    return;
   }
   if (
     !user.pendingEmailChange ||
@@ -426,7 +457,7 @@ export async function verifyUpdateEmail(
       from: user.email,
       to: user.pendingEmailChange.newEmail,
       by: user._id,
-      reason: "User requested email change",
+      reason: "User verified email change",
       at: new Date(),
       via: "user",
     });

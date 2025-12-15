@@ -4,6 +4,10 @@ Design
 # Node modules
 node_modules/
 
+# Temporary files
+npm-temp/
+temp/
+
 # Environment variables
 .env
 .env.local

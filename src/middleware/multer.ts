@@ -1,7 +1,6 @@
 import { Request } from "express";
 import multer from "multer";
-import { BadRequestError } from "./error/index.js";
-import path from "path";
+import { BadRequestError } from "./error/index.js"; 
 
 const storage = multer.diskStorage({
   destination: function (
@@ -11,20 +10,27 @@ const storage = multer.diskStorage({
   ) {
     cb(null, "./temp/uploads");
   },
-  filename: function (req, file, cb) {
-    const ext = path.extname(file.originalname);
+  filename: function (req, file, cb) { 
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    console.log("file", file, "uniqueSuffix", uniqueSuffix);
-    console.log("req", req.user);
-    cb(null, file.fieldname + "-" + uniqueSuffix + ext);
+    cb(null, file.fieldname + "-" + uniqueSuffix );
   },
 });
 
+const allowedExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
+const allowedMimetypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+
 const fileFilter: multer.Options["fileFilter"] = (req, file, cb) => {
-  if (!file.mimetype.startsWith("image/")) {
-    cb(new BadRequestError("Only image files are allowed"));
+  if (!file.mimetype.startsWith("image/") || !allowedMimetypes.includes(file.mimetype)) {
+    cb(new BadRequestError("Only image files (jpg, jpeg, png, gif, webp) are allowed"));
     return;
   }
+  
+  const fileExtension = file.originalname.substring(file.originalname.lastIndexOf(".")).toLowerCase();
+  if (!allowedExtensions.includes(fileExtension)) {
+    cb(new BadRequestError("Only image files (jpg, jpeg, png, gif, webp) are allowed"));
+    return;
+  }
+  
   cb(null, true);
 };
 

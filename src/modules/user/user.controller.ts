@@ -2,7 +2,6 @@ import {
   DeleteAllSessionsType,
   DeleteSessionParamsType,
   UpdateAccountType,
-  UpdateAvatarType,
   UpdateEmailType,
   UpdateNotificationsType,
   UpdatePasswordType,
@@ -30,6 +29,7 @@ import {
 } from "./user.service.js";
 import { AccountStatus } from "constants/accountStatus.js";
 import {
+  BadRequestError,
   NotFoundError,
   UnauthenticatedError,
 } from "@middleware/error/index.js";
@@ -75,13 +75,10 @@ export const updateAvatarController = async (req: Request, res: Response) => {
     throw new UnauthenticatedError("Authentication required");
   }
   if (!avatarData) {
-    throw new NotFoundError("Avatar file not found");
+    throw new BadRequestError("Avatar file not found");
   }
- 
   const updatedUser = await updateAvatar(userId, avatarData);
   return res.status(200).json(updatedUser);
-
-  // Implementation for updating user avatar
 };
 
 export const deleteAvatarController = async (

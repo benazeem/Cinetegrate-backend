@@ -5,12 +5,12 @@ import {
   ForbiddenError,
   InternalServerError,
   NotFoundError,
+  UnauthenticatedError,
 } from "@middleware/error/index.js";
-import { Session, SessionModel } from "@models/Session.js";
+import { SessionModel } from "@models/Session.js";
 import { type User, UserModel } from "@models/User.js";
 import { returnUserData } from "@utils/returnUserData.js";
 import {
-  UpdateAvatarType,
   UpdateNotificationsType,
   UpdatePrivacySettingsType,
 } from "@validation/user.schema.js";
@@ -54,7 +54,7 @@ export const updateAvatar = async (
 
   //TODO: Add logic to move the file from temp to cloud storage like s3 or similar
   // For now, we will just use the filename as is
-  const avatarUrl = `/uploads/avatars/${filename}`;
+  const avatarUrl = `${path}/${filename}`;
 
   const user = await UserModel.findByIdAndUpdate(
     userId,
@@ -75,6 +75,12 @@ export const deleteAvatar = async (
   if (!user) {
     throw new NotFoundError("User not found");
   }
+  /**
+   * Retrieves the current avatar URL from the user object before updating it.
+   * This variable stores the old avatar URL to enable cleanup of the previous avatar file
+   * from cloud storage if a new avatar is uploaded during the update process.
+   * If no avatar currently exists, this will be undefined or null, and the cleanup step should be skipped.
+   */
   const oldAvatarUrl = user.avatarUrl;
   if (!oldAvatarUrl) {
     return;
@@ -242,7 +248,7 @@ export const updatePassword = async (
 
   const isMatch = await bcrypt.compare(currentPassword, user.passwordHash);
   if (!isMatch) {
-    throw new ConflictError("Current password is incorrect");
+    throw new UnauthenticatedError("Current password is incorrect");
   }
   const hashedPassword = await bcrypt.hash(newPassword, 10);
   user.lastPasswordChangeAt = new Date();
@@ -250,8 +256,8 @@ export const updatePassword = async (
   user.changeHistory.push({
     field: "password",
     by: user._id,
-    oldValue: "",
-    newValue: "",
+    from: "",
+    to: "",
     reason: "User initiated password change",
     at: new Date(),
     via: "user",

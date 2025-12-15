@@ -17,11 +17,8 @@ export const avatarUpload = (
           new PayloadTooLargeError("Avatar file size exceeds the limit", err)
         );
       }
-      return res.status(400).json({
-        message: err.message,
-      });
+      return next(new Error("Multer error during file upload", err));
     }
-
     return next(err);
   });
 };

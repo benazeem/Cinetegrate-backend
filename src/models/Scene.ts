@@ -51,6 +51,7 @@ const sceneSchema = new Schema<Scene>(
     order: {
       type: Number,
       required: true,
+      min: 0,
     },
 
     title: {
@@ -101,7 +102,6 @@ const sceneSchema = new Schema<Scene>(
         },
       ],
       default: [],
-      maxlength: 3,
       validate: {
         validator: (v: SceneAssetHistoryEntry[]) => v.length <= 3,
         message: "Scene assetHistory cannot exceed 3 entries",
@@ -118,7 +118,6 @@ const sceneSchema = new Schema<Scene>(
         },
       ],
       default: [],
-      maxlength: 3,
       validate: {
         validator: (v: SceneEditHistoryEntry[]) => v.length <= 3,
         message: "Scene editHistory cannot exceed 3 entries",

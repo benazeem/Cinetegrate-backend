@@ -33,6 +33,7 @@ const projectSchema = new Schema<ProjectType>(
       type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
+      index: true,
     },
     status: {
       type: String,

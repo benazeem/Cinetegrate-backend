@@ -48,9 +48,16 @@ const fileFilter: multer.Options["fileFilter"] = (_req, file, cb) => {
     return;
   }
   const lastDotIndex = file.originalname.lastIndexOf(".");
-
+  if (lastDotIndex < 0) {
+    cb(
+      new BadRequestError(
+        "Only image files (jpg, jpeg, png, gif, webp) are allowed"
+      )
+    );
+    return;
+  }
   const fileExtension = file.originalname.substring(lastDotIndex).toLowerCase();
-  if (!allowedExtensions.includes(fileExtension) || lastDotIndex < 0) {
+  if (!allowedExtensions.includes(fileExtension)) {
     cb(
       new BadRequestError(
         "Only image files (jpg, jpeg, png, gif, webp) are allowed"

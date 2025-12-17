@@ -15,14 +15,14 @@ export interface Story extends Document {
   lastGeneratedAt?: Date;
   audioAssetId?: Types.ObjectId; // current narration audio
   backgroundAudioAssetId?: Types.ObjectId; // current background audio
-  effectAudioAssetsId?: Types.ObjectId[]; // current effect audio
+  effectAudioAssetsId?: Types.ObjectId[]; // effect audios
   finalVideoId?: Types.ObjectId; // current Final video output
   status: "active" | "rejected" | "archived";
   selected: boolean;
   generationSource: "ai" | "manual";
   contextProfileId?: Types.ObjectId;
   contextProfileVersion?: number;
-  history: StoryHistoryEntry[]; // max 3 (enforced in service)
+  editHistory: StoryHistoryEntry[]; // max 3 (enforced in service too)
   createdAt: Date;
   updatedAt: Date;
 }
@@ -92,7 +92,7 @@ const storySchema = new Schema<Story>(
     contextProfileVersion: {
       type: Number,
     },
-    history: {
+    editHistory: {
       type: [
         {
           title: { type: String },
@@ -105,6 +105,11 @@ const storySchema = new Schema<Story>(
         },
       ],
       default: [],
+      maxlength: 3,
+      validate: {
+        validator: (v: StoryHistoryEntry[]) => v.length <= 3,
+        message: "Story editHistory cannot exceed 3 entries",
+      },
     },
   },
   { timestamps: true }

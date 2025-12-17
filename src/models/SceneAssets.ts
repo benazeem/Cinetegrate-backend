@@ -41,6 +41,7 @@ const sceneAssetSchema = new Schema<SceneAsset>(
     },
     visibility: {
       type: String,
+      enum: ["private", "public"],
       default: "public",
     },
     prompt: {

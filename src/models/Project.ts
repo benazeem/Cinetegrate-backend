@@ -44,7 +44,7 @@ const projectSchema = new Schema<ProjectType>(
       enum: ["public", "private"],
       default: "private",
     },
-    contextProfileId: { type: Schema.Types.ObjectId, ref: "Context" },
+    contextProfileId: { type: Schema.Types.ObjectId, ref: "ContextProfile" },
     activeStoryId: { type: Schema.Types.ObjectId, ref: "Story" },
     activeStoryGeneratedAt: { type: Date },
     generationCounts: {

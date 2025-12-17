@@ -13,13 +13,14 @@ const storage = multer.diskStorage({
     if (!fs.existsSync(uploadPath)) {
       fs.mkdir(uploadPath, { recursive: true }, (err) => {
         if (err) {
-          return cb(err, uploadPath);
+          cb(err, uploadPath);
         } else {
           cb(null, uploadPath);
         }
       });
+    } else {
+      cb(null, uploadPath);
     }
-    cb(null, uploadPath);
   },
   filename: function (
     _req: Request,
@@ -49,7 +50,7 @@ const fileFilter: multer.Options["fileFilter"] = (_req, file, cb) => {
   const lastDotIndex = file.originalname.lastIndexOf(".");
 
   const fileExtension = file.originalname.substring(lastDotIndex).toLowerCase();
-  if (!allowedExtensions.includes(fileExtension) || lastDotIndex <= 0) {
+  if (!allowedExtensions.includes(fileExtension) || lastDotIndex < 0) {
     cb(
       new BadRequestError(
         "Only image files (jpg, jpeg, png, gif, webp) are allowed"

@@ -5,8 +5,7 @@ export interface AudioAsset extends Document {
   type: "narration" | "background" | "effect";
   url: string;
   prompt?: string; // for AI-generated audio
-  generationSource: "ai" | "upload";
-  // resolved (actual) metadata
+  generationSource: "ai" | "upload"; 
   voiceId?: string;
   language?: string;
   accent?: string;
@@ -27,36 +26,44 @@ const audioAssetSchema = new Schema<AudioAsset>(
       required: true,
       index: true,
     },
-
     type: {
       type: String,
       enum: ["narration", "background", "effect"],
       required: true,
     },
-
     url: {
       type: String,
       required: true,
     },
-
     prompt: {
       type: String,
     },
-
     generationSource: {
       type: String,
       enum: ["ai", "upload"],
       default: "ai",
     },
-
+    voiceId: {
+      type: String,
+    },
+    language: {
+      type: String,
+    },
+    accent: {
+      type: String,
+    },
+    tone: {
+      type: String,
+    },
+    pacing: {
+      type: String,
+    },
     duration: {
       type: Number,
     },
-
     format: {
       type: String,
     },
-
     saved: {
       type: Boolean,
       default: false,

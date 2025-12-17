@@ -1,6 +1,6 @@
 import { Schema, model, Document, Types } from "mongoose";
 
-interface videoDefaults {
+interface VideoDefaults {
   fps?: number;
   quality?: string;
 }
@@ -16,7 +16,7 @@ export interface AudioDefaults {
 }
 
 export interface ContextProfile extends Document {
-  userId: Types.ObjectId; 
+  userId: Types.ObjectId;
   name: string; // e.g. "Dark Horror Universe"
   description?: string; // human-readable intent
   genre?: string; // horror, sci-fi, drama
@@ -32,7 +32,7 @@ export interface ContextProfile extends Document {
   narrativeConstraints?: string; // POV, tense, length rules
   forbiddenElements?: string[]; // things AI must avoid
   audioDefaults?: AudioDefaults;
-  videoConfigDefaults?: videoDefaults;
+  videoConfigDefaults?: VideoDefaults;
 
   active: boolean; // active for project usage
   version: number; // increments on edit
@@ -95,8 +95,12 @@ const contextProfileSchema = new Schema<ContextProfile>(
         type: String,
         enum: ["male", "female", "neutral"],
       },
-      language: String,
-      accent: String,
+      language: {
+        type: String,
+      },
+      accent: {
+        type: String,
+      },
       tone: {
         type: String,
         enum: ["neutral", "calm", "dramatic", "eerie"],

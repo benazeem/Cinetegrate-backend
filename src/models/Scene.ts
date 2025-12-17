@@ -24,8 +24,8 @@ export interface Scene extends Document {
   duration?: number;
   generationSource: "ai" | "manual";
   activeAssetId?: Types.ObjectId;
-  assetHistory: SceneAssetHistoryEntry[]; // max 3 (enforced in service)
-  editHistory: SceneEditHistoryEntry[]; // max 3 (enforced in service)
+  assetHistory: SceneAssetHistoryEntry[]; // max 3 (enforced in service too)
+  editHistory: SceneEditHistoryEntry[]; // max 3 (enforced in service too)
   contextProfileId?: Types.ObjectId;
   contextProfileVersion?: number;
   createdAt: Date;
@@ -66,6 +66,7 @@ const sceneSchema = new Schema<Scene>(
 
     imagePrompt: {
       type: String,
+      required: true,
     },
     lastGeneratedAt: {
       type: Date,
@@ -100,6 +101,11 @@ const sceneSchema = new Schema<Scene>(
         },
       ],
       default: [],
+      maxlength: 3,
+      validate: {
+        validator: (v: SceneAssetHistoryEntry[]) => v.length <= 3,
+        message: "Scene assetHistory cannot exceed 3 entries",
+      },
     },
     editHistory: {
       type: [
@@ -112,6 +118,11 @@ const sceneSchema = new Schema<Scene>(
         },
       ],
       default: [],
+      maxlength: 3,
+      validate: {
+        validator: (v: SceneEditHistoryEntry[]) => v.length <= 3,
+        message: "Scene editHistory cannot exceed 3 entries",
+      },
     },
     contextProfileId: {
       type: Schema.Types.ObjectId,

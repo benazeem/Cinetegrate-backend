@@ -1,11 +1,11 @@
 import { Schema, model, Document, Types } from "mongoose";
 
-interface renderConfig {
+interface RenderConfig {
   fps?: number;
   resolution?: string; // 1080p, 4k
   bitrate?: number;
   codec?: string; // h264, h265
-  quality?: "low" | "medium" | "high";
+  quality?: "480p" | "720p" | "1080p" | "1440p";
 }
 
 export interface FinalVideo extends Document {
@@ -18,8 +18,7 @@ export interface FinalVideo extends Document {
   narrationAudioAssetId?: Types.ObjectId;
   sceneAssetIds: Types.ObjectId[]; // resolved visuals in order
   duration?: number;
-  resolution?: string;
-  format?: string;
+  renderConfig?: RenderConfig;
   status: "rendering" | "completed" | "failed";
   createdAt: Date;
   updatedAt: Date;
@@ -65,13 +64,21 @@ const finalVideoSchema = new Schema<FinalVideo>(
       ref: "AudioAsset",
     },
     sceneAssetIds: {
-      type: [Schema.Types.ObjectId],
+      type: [{ type: Schema.Types.ObjectId, ref: "SceneAsset" }],
       ref: "SceneAsset",
       required: true,
     },
     duration: Number,
-    resolution: String,
-    format: String,
+    renderConfig: {
+      fps: Number,
+      resolution: String,
+      bitrate: Number,
+      codec: String,
+      quality: {
+        type: String,
+        enum: ["480p", "720p", "1080p", "1440p"],
+      },
+    },
     status: {
       type: String,
       enum: ["rendering", "completed", "failed"],

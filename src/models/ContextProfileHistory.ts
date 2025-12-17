@@ -1,6 +1,6 @@
 import { Schema, model, Document, Types } from "mongoose";
 
-interface videoDefaults {
+interface VideoDefaults {
   fps?: number;
   quality?: string;
 }
@@ -34,7 +34,7 @@ export interface ContextProfileHistory extends Document {
     narrativeConstraints?: string;
     forbiddenElements?: string[];
     audioDefaults?: AudioDefaults;
-    videoConfigDefaults?: videoDefaults;
+    videoConfigDefaults?: VideoDefaults;
   };
 
   changeReason?: string; // optional user/system note

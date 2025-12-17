@@ -27,10 +27,8 @@ import {
   updatePrivacySettings,
   updateProfile,
 } from "./user.service.js";
-import { AccountStatus } from "constants/accountStatus.js";
 import {
   BadRequestError,
-  NotFoundError,
   UnauthenticatedError,
 } from "@middleware/error/index.js";
 

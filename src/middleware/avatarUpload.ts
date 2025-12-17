@@ -14,10 +14,13 @@ export const avatarUpload = (
     if (err instanceof multer.MulterError) {
       if (err.code === "LIMIT_FILE_SIZE") {
         return next(
-          new PayloadTooLargeError("Avatar file size exceeds the limit", err)
+          new PayloadTooLargeError(
+            "Avatar file size exceeds the 2MB limit",
+            err
+          )
         );
       }
-      return next(new Error("Multer error during file upload", err));
+      return next(new Error("Multer error during file upload", { cause: err }));
     }
     return next(err);
   });

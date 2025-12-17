@@ -264,8 +264,8 @@ export async function resetPassword(rawToken: string, newPassword: string) {
     user.changeHistory.push({
       field: "password",
       by: user._id,
-      from: "",
-      to: "",
+      from: null,
+      to: null,
       reason: "User reset the password via password reset",
       at: new Date(),
       via: "user",

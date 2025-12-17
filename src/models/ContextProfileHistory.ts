@@ -1,23 +1,9 @@
 import { Schema, model, Document, Types } from "mongoose";
-
-interface VideoDefaults {
-  fps?: number;
-  quality?: string;
-}
-
-export interface AudioDefaults {
-  voiceId?: string; // provider-specific voice identifier
-  gender?: "male" | "female" | "neutral";
-  language?: string; // en-US, hi-IN, etc.
-  accent?: string; // optional locale/accent
-  tone?: "neutral" | "calm" | "dramatic" | "eerie";
-  pacing?: "slow" | "medium" | "fast";
-  emotionBias?: "flat" | "expressive" | "subtle";
-}
+import { VideoDefaults, AudioDefaults } from "./ContextProfile.js";
 
 export interface ContextProfileHistory extends Document {
   contextProfileId: Types.ObjectId;
-  userId: Types.ObjectId; 
+  userId: Types.ObjectId;
   version: number; // version being archived
   snapshot: {
     name: string;
@@ -127,6 +113,12 @@ const contextProfileHistorySchema = new Schema<ContextProfileHistory>(
   },
   { timestamps: false }
 );
+
+// Add compound index for efficient version history queries
+contextProfileHistorySchema.index({ contextProfileId: 1, version: 1 });
+
+// Optional: Add index for time-based queries
+contextProfileHistorySchema.index({ contextProfileId: 1, changedAt: -1 });
 
 export const ContextProfileHistoryModel = model<ContextProfileHistory>(
   "ContextProfileHistory",

@@ -10,26 +10,24 @@ const storage = multer.diskStorage({
     cb: (error: Error | null, destination: string) => void
   ) {
     const uploadPath = "./temp/uploads";
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdir(uploadPath, { recursive: true }, (err) => {
-        if (err) {
-          cb(err, uploadPath);
-        } else {
-          cb(null, uploadPath);
-        }
-      });
-    } else {
-      cb(null, uploadPath);
-    }
+    fs.mkdir(uploadPath, { recursive: true }, (err) => {
+      if (err) {
+        cb(err, uploadPath);
+      } else {
+        cb(null, uploadPath);
+      }
+    });
   },
   filename: function (
     _req: Request,
     file: Express.Multer.File,
     cb: (error: Error | null, filename: string) => void
   ) {
-    const fileExtension = file.originalname
-      .substring(file.originalname.lastIndexOf("."))
-      .toLowerCase();
+    const lastDotIndex = file.originalname.lastIndexOf(".");
+    const fileExtension =
+      lastDotIndex >= 0
+        ? file.originalname.substring(lastDotIndex).toLowerCase()
+        : "";
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
     cb(null, file.fieldname + "-" + uniqueSuffix + fileExtension);
   },

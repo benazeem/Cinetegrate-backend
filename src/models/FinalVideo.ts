@@ -1,12 +1,10 @@
 import { Schema, model, Document, Types } from "mongoose";
-import { property } from "zod";
 
 interface RenderConfig {
   fps?: number;
-  resolution?: string; // 1080p, 4k
+  resolution?: "480p" | "720p" | "1080p" | "1440p";
   bitrate?: number;
-  codec?: string; // h264, h265
-  quality?: "480p" | "720p" | "1080p" | "1440p";
+  codec?: string; // h264, h265 ;
 }
 
 export interface FinalVideo extends Document {
@@ -64,19 +62,16 @@ const finalVideoSchema = new Schema<FinalVideo>(
       type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
-      index: true,
     },
     projectId: {
       type: Schema.Types.ObjectId,
       ref: "Project",
       required: true,
-      index: true,
     },
     storyId: {
       type: Schema.Types.ObjectId,
       ref: "Story",
       required: true,
-      index: true,
     },
     videoUrl: {
       type: String,
@@ -103,13 +98,12 @@ const finalVideoSchema = new Schema<FinalVideo>(
     duration: Number,
     renderConfig: {
       fps: Number,
-      resolution: String,
-      bitrate: Number,
-      codec: String,
-      quality: {
+      resolution: {
         type: String,
         enum: ["480p", "720p", "1080p", "1440p"],
       },
+      bitrate: Number,
+      codec: String,
     },
     status: {
       type: String,
@@ -120,6 +114,8 @@ const finalVideoSchema = new Schema<FinalVideo>(
   },
   { timestamps: true }
 );
+
+finalVideoSchema.index({ userId: 1, status: 1 });
 
 export const FinalVideoModel = model<FinalVideo>(
   "FinalVideo",

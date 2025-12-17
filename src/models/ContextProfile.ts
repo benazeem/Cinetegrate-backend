@@ -1,6 +1,6 @@
 import { Schema, model, Document, Types } from "mongoose";
 
-interface VideoDefaults {
+export interface VideoDefaults {
   fps?: number;
   quality?: string;
 }

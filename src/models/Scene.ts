@@ -45,7 +45,6 @@ const sceneSchema = new Schema<Scene>(
       type: Schema.Types.ObjectId,
       ref: "Story",
       required: true,
-      index: true,
     },
 
     order: {
@@ -134,5 +133,7 @@ const sceneSchema = new Schema<Scene>(
   },
   { timestamps: true }
 );
+
+sceneSchema.index({ storyId: 1, order: 1 }, { unique: true });
 
 export const SceneModel = model<Scene>("Scene", sceneSchema);

@@ -32,7 +32,7 @@ const sceneAssetSchema = new Schema<SceneAsset>(
     },
     type: {
       type: String,
-      enum: ["image", "video" ],
+      enum: ["image", "video"],
       required: true,
     },
     url: {

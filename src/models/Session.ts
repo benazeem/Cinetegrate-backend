@@ -30,9 +30,12 @@ const sessionSchema = new Schema({
   isp: { type: String },
   cpu: { type: String },
   engine: { type: String },
+  refreshTokenHash: { type: String, required: true },
+  csrfTokenHash: { type: String, required: true },
   createdAt: { type: Date, default: Date.now },
   lastUsedAt: { type: Date, default: Date.now },
   revokedAt: { type: Date, default: null },
+  valid: { type: Boolean, default: true },
 });
 
 //TTL index: automatically remove sessions not used for 30 days

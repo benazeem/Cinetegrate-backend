@@ -67,11 +67,13 @@ const finalVideoSchema = new Schema<FinalVideo>(
       type: Schema.Types.ObjectId,
       ref: "Project",
       required: true,
+      indexe: true,
     },
     storyId: {
       type: Schema.Types.ObjectId,
       ref: "Story",
       required: true,
+      index: true,
     },
     videoUrl: {
       type: String,

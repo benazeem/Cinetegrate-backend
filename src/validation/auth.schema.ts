@@ -34,7 +34,11 @@ const registerSchema = z
           "Username may contain letters, numbers, dash and underscore only",
       }),
 
-    displayName: z.string().trim().min(1).max(80),
+    displayName: z
+      .string()
+      .trim()
+      .min(1, "Display name is required")
+      .max(80, "Display name is too long"),
   })
   .superRefine((data, ctx) => {
     if (data.password !== data.confirmPassword) {
@@ -47,14 +51,18 @@ const registerSchema = z
   })
   .strict();
 
-const loginSchema = z.object({
-  email: z.email(),
-  password: z.string().min(1, "Password is required"),
-}).strict();
+const loginSchema = z
+  .object({
+    email: z.email(),
+    password: z.string().min(1, "Password is required"),
+  })
+  .strict();
 
-const forgotPasswordSchema = z.object({
-  email: z.string().trim().toLowerCase().email(),
-}).strict();
+const forgotPasswordSchema = z
+  .object({
+    email: z.string().trim().toLowerCase().email(),
+  })
+  .strict();
 
 const resetPasswordSchema = z
   .object({
@@ -84,11 +92,19 @@ const verifyEmailSchema = z
   })
   .strict();
 
+const verifyUpdateEmailSchema = z
+  .object({
+    verificationToken: z.string().min(10),
+    code: z.string().length(6, { message: "Code must be 6 characters long" }),
+  })
+  .strict();
+
 type LoginInput = z.infer<typeof loginSchema>;
 type RegisterInput = z.infer<typeof registerSchema>;
 type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 type ForgetPasswordInput = z.infer<typeof forgotPasswordSchema>;
 type VerifyEmailInput = z.infer<typeof verifyEmailSchema>;
+type VerifyUpdateEmailInput = z.infer<typeof verifyUpdateEmailSchema>;
 
 export type {
   LoginInput,
@@ -96,6 +112,7 @@ export type {
   ResetPasswordInput,
   ForgetPasswordInput,
   VerifyEmailInput,
+  VerifyUpdateEmailInput,
 };
 export {
   loginSchema,
@@ -103,28 +120,5 @@ export {
   resetPasswordSchema,
   forgotPasswordSchema,
   verifyEmailSchema,
+  verifyUpdateEmailSchema,
 };
-
-export function validateBody<T extends z.ZodTypeAny>(schema: T) {
-  return async (req: Request, _res: Response, next: NextFunction) => {
-    try {
-      // parseAsync to allow async refinements in future
-      const parsed = await schema.parseAsync(req.body);
-      // attach to request for typed access in controllers
-      (req as unknown as { validatedBody?: z.infer<T> }).validatedBody = parsed;
-      next();
-    } catch (err) {
-      if (err instanceof z.ZodError) {
-        // map Zod errors to a clean JSON shape
-        const errors = err.issues.map((e) => ({
-          path: e.path.join("."),
-          message: e.message,
-        }));
-        return _res
-          .status(400)
-          .json({ error: "validation_error", details: errors });
-      }
-      next(err);
-    }
-  };
-}

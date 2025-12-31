@@ -1,6 +1,7 @@
 // src/middleware/errorHandler.ts
 import { NextFunction, Request, Response } from "express";
 import { AppError } from "./appError.js";
+import logger from "@utils/logger.js";
 
 const errorHandler = (
   err: unknown,
@@ -8,17 +9,21 @@ const errorHandler = (
   res: Response,
   next: NextFunction
 ) => {
-  console.error("ERROR:", err);
-
   // If it's a known error (instance of AppError)
   if (err instanceof AppError) {
-    return res.status(err.statusCode).json({
-      status: "error",
+    logger.error({
       message: err.message,
-      code: err.code,
       details: err.details,
       stack: err.stack,
+      request: {
+        method: req.method,
+        url: req.originalUrl,
+        headers: req.headers,
+        body: req.body,
+      },
     });
+
+    return res.status(err.statusCode).json(err.serialize());
   }
 
   return res.status(500).json({

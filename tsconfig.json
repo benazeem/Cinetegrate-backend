@@ -21,7 +21,7 @@
       "@db/*": ["db/*"],
       "@models/*": ["models/*"],
       "@routes/*":["routes/*"],
-      "@validation/*":["validation/*"]
+      "@validation/*":["validation/*"], 
     }
   },
   "include": ["src"]

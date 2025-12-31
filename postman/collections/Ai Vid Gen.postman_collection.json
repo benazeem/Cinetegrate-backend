@@ -1,0 +1,192 @@
+{
+  "info": {
+    "_postman_id": "686c8ae3-4106-46cb-b479-5d833c80e93f",
+    "name": "Ai Vid Gen",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "{{base_url}}/projects/:projectId",
+      "id": "b3a36768-c57c-41af-a525-50063fd5e759",
+      "protocolProfileBehavior": {
+        "disableBodyPruning": true
+      },
+      "request": {
+        "method": "PATCH",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n    \"title\":\" huyasgdiujsagtyfcij\",\r\n    \"status\":\"delete\",\r\n    \"visibility\":\"private\"\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/projects/:projectId",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "projects",
+            ":projectId"
+          ],
+          "variable": [
+            {
+              "key": "projectId",
+              "value": "6943ffeaf0739e8ec0331c86",
+              "uuid": "0aa39b46-8347-4689-ab96-433780a82888"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "{{base_url}}/auth/refresh-token",
+      "id": "038c970e-2a09-48c3-a6ac-9516b300ff18",
+      "protocolProfileBehavior": {
+        "disableBodyPruning": true
+      },
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-Forwarded-For",
+            "value": "49.37.182.221",
+            "type": "text",
+            "uuid": "3b4f68c9-6d59-4d55-93d1-fcad469eae33"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/auth/refresh-token",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "refresh-token"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "{{base_url}}/projects/:projectId",
+      "id": "9686111c-4b6f-44fa-996c-a29438e26077",
+      "protocolProfileBehavior": {
+        "disableBodyPruning": true
+      },
+      "request": {
+        "method": "PATCH",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n    \"title\":\" huyasgdiujsagtyfcij\",\r\n    \"status\":\"delete\",\r\n    \"visibility\":\"private\"\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/projects/:projectId",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "projects",
+            ":projectId"
+          ],
+          "variable": [
+            {
+              "key": "projectId",
+              "value": "6943ffeaf0739e8ec0331c86",
+              "uuid": "0aa39b46-8347-4689-ab96-433780a82888"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "{{base_url}}/projects/:projectId",
+      "id": "05e443b9-60d3-40f8-8a1b-31fdf5a57767",
+      "protocolProfileBehavior": {
+        "disableBodyPruning": true
+      },
+      "request": {
+        "method": "GET",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n    \"bio\":\"Chuddu Mall\",\r\n    \"links\":{\r\n        \"website\":\"https://gmail.com\",\r\n        \"facebook\": \"https://gmail.com\",\r\n        \"instagram\":\"https://gitmail.com\"\r\n    }\r\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/projects/:projectId",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "projects",
+            ":projectId"
+          ],
+          "variable": [
+            {
+              "key": "projectId",
+              "value": "6943ffeaf0739e8ec0331c86",
+              "uuid": "64bcac29-bb8f-4d3b-b46c-ce58c93d989a"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "{{base_url}}/projects/:projectId",
+      "id": "2436b647-3a4a-4faa-8768-beb78e1da5a2",
+      "protocolProfileBehavior": {
+        "disableBodyPruning": true
+      },
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n    \"bio\":\"Chuddu Mall\",\r\n    \"links\":{\r\n        \"website\":\"https://gmail.com\",\r\n        \"facebook\": \"https://gmail.com\",\r\n        \"instagram\":\"https://gitmail.com\"\r\n    }\r\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/projects/:projectId",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "projects",
+            ":projectId"
+          ],
+          "variable": [
+            {
+              "key": "projectId",
+              "value": "69440d53032f4c583116b396",
+              "uuid": "81d17213-7105-428f-ba06-16d21b4c5ef7"
+            }
+          ]
+        }
+      },
+      "response": []
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 import jwt, { type SignOptions } from "jsonwebtoken";
 import crypto from "crypto";
-import type { ObjectIdSchemaDefinition } from "mongoose";
+import type { Types } from "mongoose";
 
 const ACCESS_TOKEN_EXPIRES_IN: SignOptions["expiresIn"] = process.env
   .ACCESS_TOKEN_EXPIRES_IN as SignOptions["expiresIn"];
@@ -34,6 +34,18 @@ export function verifyToken(rawToken: string, tokenHash: string) {
   return true;
 }
 
+export function compareHashTokens(hash1: string, hash2: string): boolean {
+  const hash1Buffer = Buffer.from(hash1, "hex");
+  const hash2Buffer = Buffer.from(hash2, "hex");
+  if (
+    hash1Buffer.length !== hash2Buffer.length ||
+    !crypto.timingSafeEqual(hash1Buffer, hash2Buffer)
+  ) {
+    return false;
+  }
+  return true;
+}
+
 export function hashToken(rawToken: string) {
   return crypto.createHash("sha256").update(rawToken).digest("hex");
 }
@@ -41,16 +53,13 @@ export function hashToken(rawToken: string) {
 export function generateSessionId() {
   return crypto.randomBytes(32).toString("hex");
 }
-export function generateAccessToken(
-  userId: ObjectIdSchemaDefinition,
-  sessionId: string
-) {
+export function generateAccessToken(userId: Types.ObjectId, sessionId: string) {
   return jwt.sign({ userId, sessionId }, ACCESS_TOKEN_SECRET, {
     expiresIn: ACCESS_TOKEN_EXPIRES_IN,
   });
 }
 export function generateRefreshToken(
-  userId: ObjectIdSchemaDefinition,
+  userId: Types.ObjectId,
   sessionId: string
 ) {
   return jwt.sign({ userId, sessionId }, REFRESH_TOKEN_SECRET, {
@@ -59,10 +68,6 @@ export function generateRefreshToken(
 }
 
 export function generateCsrfToken() {
-  const token = crypto.randomBytes(24).toString("hex");
-  const signed = crypto
-    .createHmac("sha256", process.env.CSRF_SECRET!)
-    .update(token)
-    .digest("hex");
-  return `${token}.${signed}`;
+  const token = crypto.randomBytes(24).toString("hex"); 
+  return token;
 }

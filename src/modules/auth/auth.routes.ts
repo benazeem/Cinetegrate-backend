@@ -15,15 +15,17 @@ import {
   loginSchema,
   registerSchema,
   resetPasswordSchema,
-  validateBody,
   verifyEmailSchema,
+  verifyUpdateEmailSchema,
 } from "@validation/auth.schema.js";
+import { validateBody } from "@validation/validateBody.js";
 import { asyncHandler } from "@utils/asyncHandler.js";
-import { requireAuth as auth } from "@middleware/auth/requireAuth.js";
+import { authMiddleware } from "@middleware/auth/requireAuth.js";
+import { csrfMiddleware } from "@middleware/security/requireCsrf.js";
+import { requireActiveAccount } from "@middleware/security/accountStatusMiddleware.js";
 
 const router = Router();
 
-// POST /api/auth/register
 router.post(
   "/register",
   validateBody(registerSchema),
@@ -43,26 +45,40 @@ router.post(
   asyncHandler(resetPasswordController)
 );
 
-router.post("/refresh-token", asyncHandler(refreshTokenController));
+router.post(
+  "/refresh-token",
+  csrfMiddleware,
+  asyncHandler(refreshTokenController)
+);
 
 router.post(
   "/email/verification",
-  auth,
+  authMiddleware,
+  requireActiveAccount,
   asyncHandler(emailVerificationController)
 );
 
 router.post(
   "/email/verify",
+  authMiddleware,
+  requireActiveAccount,
   validateBody(verifyEmailSchema),
   asyncHandler(verifyEmailController)
 );
 
 router.post(
   "/email/verify-change",
-  validateBody(verifyEmailSchema),
+  authMiddleware,
+  requireActiveAccount,
+  validateBody(verifyUpdateEmailSchema),
   asyncHandler(verifyEmailChangeController)
-)
+);
 
-router.post("/logout", asyncHandler(logoutController));
+router.post(
+  "/logout",
+  authMiddleware,
+  csrfMiddleware,
+  asyncHandler(logoutController)
+);
 
 export default router;

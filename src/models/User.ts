@@ -1,4 +1,4 @@
-import { ACCOUNT_STATUSES } from "constants/accountStatus.js";
+import { ACCOUNT_STATUSES } from "constants/authConsts.js";
 import {
   Schema,
   model,
@@ -19,6 +19,7 @@ const UpdateEmailSchema = new Schema(
   {
     newEmail: { type: String, trim: true, lowercase: true },
     tokenHash: { type: String },
+    code: { type: String },
     expiresAt: { type: Date },
     requestedAt: { type: Date },
     requestMethod: { type: String }, // "self" | "oauth"
@@ -84,25 +85,28 @@ const providerSchema = new Schema(
   { _id: false } // no separate _id needed per provider
 );
 
-const privacyPrefsSchema = new Schema({
-  profileVisibility: {
-    type: String,
-    enum: ["private", "public", "unlisted"],
-    default: "private",
+const privacyPrefsSchema = new Schema(
+  {
+    profileVisibility: {
+      type: String,
+      enum: ["private", "public", "unlisted"],
+      default: "private",
+    },
+    showEmailOnProfile: {
+      type: Boolean,
+      default: false,
+    },
+    showLinksOnProfile: {
+      type: Boolean,
+      default: true,
+    },
+    allowDiscoverability: {
+      type: Boolean,
+      default: true,
+    },
   },
-  showEmailOnProfile: {
-    type: Boolean,
-    default: false,
-  },
-  showLinksOnProfile: {
-    type: Boolean,
-    default: true,
-  },
-  allowDiscoverability: {
-    type: Boolean,
-    default: true,
-  },
-});
+  { _id: false }
+);
 
 /**
  * Subdocument: notification preferences
@@ -175,6 +179,7 @@ const userSchema = new Schema(
       type: String,
       trim: true,
       maxlength: 80,
+      required: true,
     },
     username: {
       type: String,
@@ -184,6 +189,7 @@ const userSchema = new Schema(
       index: true,
       sparse: true, // allows null without unique conflict
       unique: true,
+      required: true,
     },
     avatarUrl: {
       type: String,
@@ -270,12 +276,6 @@ const userSchema = new Schema(
 
     accountStatus: { type: String, enum: ACCOUNT_STATUSES, default: "active" },
 
-    changeHistory: {
-      type: [changeMetaSchema],
-      default: [],
-      select: false,
-    },
-
     // Billing
     billingCustomerId: { type: String },
     billingProvider: { type: String }, // "stripe" | "razorpay" | etc
@@ -287,8 +287,7 @@ const userSchema = new Schema(
     },
     currentPeriodEnd: { type: Date },
     trialEndsAt: { type: Date },
-    cancelAtPeriodEnd: { type: Boolean, default: false },
-
+    cancelAtPeriodEnd: { type: Boolean, default: false }, 
     // Notification settings
     notificationPrefs: {
       type: notificationPrefsSchema,
@@ -297,8 +296,7 @@ const userSchema = new Schema(
         inApp: true,
         marketingEmails: false,
       }),
-    },
-
+    }, 
     // Privacy prefs
     privacyPrefs: {
       type: privacyPrefsSchema,
@@ -315,6 +313,12 @@ const userSchema = new Schema(
     marketingConsentAt: { type: Date },
     deletedAt: {
       type: Date,
+    },
+    changeHistory: {
+      type: [changeMetaSchema],
+      default: [],
+      select: false,
+      cap: 100,
     },
   },
   {

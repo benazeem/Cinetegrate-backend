@@ -2,8 +2,8 @@ import { Schema, model, Document, Types, HydratedDocument } from "mongoose";
 export interface ProjectType extends Document {
   userId: Types.ObjectId;
   title: string;
-  description?: string;
-  status: "active" | "drafted" | "archived" | "deleted";
+  description: string;
+  status: "active" | "draft" | "archive" | "delete";
   visibility: "public" | "private";
   contextProfileId?: Types.ObjectId;
   activeStoryId?: Types.ObjectId;
@@ -15,6 +15,8 @@ export interface ProjectType extends Document {
     audiosGenerated: number;
     videosGenerated: number;
   };
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 const projectSchema = new Schema<ProjectType>(
@@ -22,22 +24,23 @@ const projectSchema = new Schema<ProjectType>(
     title: {
       type: String,
       required: true,
+      maxlength: 255,
       trim: true,
     },
     description: {
       type: String,
-      maxlength: 1000,
+      required: true,
+      maxlength: 500,
       trim: true,
     },
     userId: {
       type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
-      index: true,
     },
     status: {
       type: String,
-      enum: ["active", "drafted", "archived", "deleted"],
+      enum: ["active", "draft", "archive", "delete"],
       default: "active",
     },
     visibility: {
@@ -58,6 +61,8 @@ const projectSchema = new Schema<ProjectType>(
   },
   { timestamps: true }
 );
+
+projectSchema.index({ userId: 1, status: 1, createdAt: -1 });
 
 export type Project = HydratedDocument<ProjectType>;
 

@@ -6,10 +6,13 @@ dotenv.config();
 const password = encodeURIComponent(process.env.DB_PASSWORD ?? "");
 const username = encodeURIComponent(process.env.DB_USERNAME ?? "");
 
-const CONNECTION_STRING = `mongodb+srv://${username}:${password}@db0.huxhv46.mongodb.net/?appName=DB0`;
-
+const CONNECTION_STRING = `${
+  process.env.NODE_ENV !== "production"
+    ? "mongodb://localhost:27017/your_db_name?replicaSet=rs0"
+    : `mongodb+srv://${username}:${password}@db0.huxhv46.mongodb.net/?appName=DB0`
+}`;
 const connectDB = async () => {
-  try { 
+  try {
     await mongoose.connect(`${CONNECTION_STRING}`, {
       dbName: "myapp",
     });

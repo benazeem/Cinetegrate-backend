@@ -1,8 +1,9 @@
+import { AccountStatus } from "constants/authConsts.js";
 import type { CookieOptions } from "express";
 import type { Request, Response } from "express";
 import {
   createPasswordResetRequest,
-  emailVerification,
+  sendEmailVerification,
   loginUser,
   logoutUser,
   refreshTokens,
@@ -16,8 +17,9 @@ import type {
   LoginInput,
   ForgetPasswordInput,
   VerifyEmailInput,
+  VerifyUpdateEmailInput,
 } from "@validation/auth.schema.js";
-import { UnauthenticatedError } from "@middleware/error/index.js";
+import { AuthenticatedRequest, ValidatedRequest } from "types/RequestTypes.js";
 
 const CookieOptions: CookieOptions = {
   httpOnly: true,
@@ -27,8 +29,7 @@ const CookieOptions: CookieOptions = {
 };
 
 export const registerController = async (req: Request, res: Response) => {
-  const body = (req as unknown as { validatedBody?: RegisterInput })
-    .validatedBody!;
+  const body = (req as ValidatedRequest<RegisterInput>).validatedBody;
 
   const userAgent: string = req.headers["user-agent"] || "unknown";
   const ip =
@@ -70,9 +71,7 @@ export const registerController = async (req: Request, res: Response) => {
 };
 
 export const loginController = async (req: Request, res: Response) => {
-  const body = (req as unknown as { validatedBody?: LoginInput })
-    .validatedBody!;
-
+  const body = (req as ValidatedRequest<LoginInput>).validatedBody;
   const userAgent: string = req.headers["user-agent"] || "unknown";
   const ip =
     req.headers["x-forwarded-for"] ||
@@ -83,7 +82,7 @@ export const loginController = async (req: Request, res: Response) => {
   const payload = { ...body, userAgent, ip };
 
   const result = await loginUser(payload);
-  const { user, accessToken, refreshToken, csrfToken } = result;
+  const { user, accessToken, refreshToken, csrfToken, accountStatus } = result;
 
   return res
     .status(200)
@@ -107,13 +106,13 @@ export const loginController = async (req: Request, res: Response) => {
         username: user.username,
         displayName: user.displayName,
         avatar: user.avatarUrl,
+        accountStatus: accountStatus,
       },
     });
 };
 
 export const forgotPasswordController = async (req: Request, res: Response) => {
-  const payload = (req as unknown as { validatedBody?: ForgetPasswordInput })
-    .validatedBody!;
+  const payload = (req as ValidatedRequest<ForgetPasswordInput>).validatedBody;
   await createPasswordResetRequest(payload.email);
   return res.status(200).json({
     status: "success",
@@ -123,7 +122,9 @@ export const forgotPasswordController = async (req: Request, res: Response) => {
 };
 
 export const resetPasswordController = async (req: Request, res: Response) => {
-  const { token, password } = (req as any).validatedBody;
+  const { token, password } = (
+    req as ValidatedRequest<{ token: string; password: string }>
+  ).validatedBody;
   await resetPassword(token, password);
   return res.status(200).json({
     status: "success",
@@ -133,11 +134,17 @@ export const resetPasswordController = async (req: Request, res: Response) => {
 
 export const refreshTokenController = async (req: Request, res: Response) => {
   const reqRefreshToken = req.cookies["refresh-token"];
+  const userAgent: string = req.headers["user-agent"] || "unknown";
+  const ip =
+    req.headers["x-forwarded-for"] ||
+    req.headers["x-real-ip"] ||
+    req.ip ||
+    req.socket.remoteAddress;
   if (!reqRefreshToken) {
     return res.status(401).json({ message: "No refresh token provided" });
   }
 
-  const result = await refreshTokens(reqRefreshToken);
+  const result = await refreshTokens(reqRefreshToken, userAgent, ip);
   const { accessToken, refreshToken, csrfToken } = result;
   return res
     .status(200)
@@ -161,21 +168,17 @@ export const emailVerificationController = async (
   req: Request,
   res: Response
 ) => {
-  const userId = req.user?._id;
+  const userId = (req as AuthenticatedRequest).user?._id;
 
-  if (!userId) {
-    throw new UnauthenticatedError("Authentication required");
-  }
-  await emailVerification(userId);
+  await sendEmailVerification(userId);
   return res.status(200).json({
     message: "Verification email sent successfully",
   });
 };
 
 export const verifyEmailController = async (req: Request, res: Response) => {
-  const { verificationToken } = (
-    req as unknown as { validatedBody?: VerifyEmailInput }
-  ).validatedBody!;
+  const { verificationToken } = (req as ValidatedRequest<VerifyEmailInput>)
+    .validatedBody;
 
   await verifyEmail(verificationToken);
   return res.status(200).json({
@@ -187,10 +190,11 @@ export const verifyEmailChangeController = async (
   req: Request,
   res: Response
 ) => {
-  const { verificationToken } = (
-    req as unknown as { validatedBody?: VerifyEmailInput }
-  ).validatedBody!;
-  await verifyUpdateEmail(verificationToken);
+  const { verificationToken, code } = (
+    req as ValidatedRequest<VerifyUpdateEmailInput>
+  ).validatedBody;
+  const currentSessionId = (req as AuthenticatedRequest).sessionId;
+  await verifyUpdateEmail(verificationToken, code, currentSessionId);
   return res.status(200).json({
     message: "Email change verified successfully",
   });

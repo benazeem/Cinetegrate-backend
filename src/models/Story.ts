@@ -1,3 +1,4 @@
+import { User } from '@models/User.js';
 import { Schema, model, Document, Types } from "mongoose";
 
 export interface StoryHistoryEntry {
@@ -23,6 +24,7 @@ export interface Story extends Document {
   contextProfileId?: Types.ObjectId;
   contextProfileVersion?: number;
   editHistory: StoryHistoryEntry[]; // max 3 (enforced in service too)
+  savedBy: Types.ObjectId[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -138,6 +140,10 @@ const storySchema = new Schema<Story>(
         message: "Story editHistory cannot exceed 3 entries",
       },
     },
+    savedBy:[{
+      type: Schema.Types.ObjectId, 
+      ref: "User"
+    }]
   },
   { timestamps: true }
 );

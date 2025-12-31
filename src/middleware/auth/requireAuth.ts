@@ -3,21 +3,18 @@ import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { UserModel } from "@models/User.js";
 import { SessionModel } from "@models/Session.js";
-import {
-  NotFoundError,
-  UnauthenticatedError,
-} from "@middleware/error/index.js";
+import { UnauthenticatedError } from "@middleware/error/index.js";
 
-export const requireAuth = async (
+export const authMiddleware = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
   try {
-    const accessToken = req.cookies["access-token"]; 
+    const accessToken = req.cookies["access-token"];
 
     if (!accessToken) {
-      throw new UnauthenticatedError("user not authenticated, no access token found");
+      throw new UnauthenticatedError("Authentication required");
     }
 
     let decoded;
@@ -27,7 +24,7 @@ export const requireAuth = async (
         sessionId: string;
       };
     } catch (err) {
-      throw new UnauthenticatedError("Invalid or expired token");
+      throw new UnauthenticatedError("Authentication required");
     }
 
     // find user with this session
@@ -36,16 +33,17 @@ export const requireAuth = async (
     });
 
     if (!user) {
-      throw new NotFoundError("User not found");
+      throw new UnauthenticatedError("Authentication required");
     }
 
     const session = await SessionModel.findOne({
       sessionId: decoded.sessionId,
       userId: decoded.userId,
+      valid: true,
     });
 
     if (!session || session.revokedAt) {
-      throw new UnauthenticatedError("Session revoked or not found");
+      throw new UnauthenticatedError("Authentication required");
     }
 
     // ✅ update lastUsedAt for this session

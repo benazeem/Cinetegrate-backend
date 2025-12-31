@@ -35,7 +35,7 @@ Your existing email address will remain unchanged.
 
       <p style="margin: 0 0 16px;">
         To complete this change, please confirm your new email address by clicking the button below.
-        This link will expire in <strong>1 hour</strong>.
+        This link will expire in <strong>30 minutes</strong>.
       </p>
 
       <p style="margin: 20px 0;">

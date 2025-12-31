@@ -26,6 +26,7 @@ const getCorsConfig = (): CorsOptions => {
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
         allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
         
+        
         // Allow cookies or authorization headers to be sent
         credentials: true, 
         

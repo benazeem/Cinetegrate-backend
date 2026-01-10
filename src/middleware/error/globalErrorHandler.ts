@@ -24,8 +24,7 @@ const errorHandler = (
     });
 
     return res.status(err.statusCode).json(err.serialize());
-  }
-
+  } 
   return res.status(500).json({
     status: "error",
     message: "Internal Server Error",

@@ -22,6 +22,8 @@
       "@models/*": ["models/*"],
       "@routes/*":["routes/*"],
       "@validation/*":["validation/*"], 
+      "@libs/*": ["libs/*"],
+      "@constants/*": ["constants/*"]
     }
   },
   "include": ["src"]

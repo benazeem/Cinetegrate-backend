@@ -1,4 +1,3 @@
-import { AccountStatus } from "constants/authConsts.js";
 import type { CookieOptions } from "express";
 import type { Request, Response } from "express";
 import {
@@ -18,8 +17,7 @@ import type {
   ForgetPasswordInput,
   VerifyEmailInput,
   VerifyUpdateEmailInput,
-} from "@validation/auth.schema.js";
-import { AuthenticatedRequest, ValidatedRequest } from "types/RequestTypes.js";
+} from "@validation/auth.schema.js"; 
 
 const CookieOptions: CookieOptions = {
   httpOnly: true,
@@ -28,8 +26,12 @@ const CookieOptions: CookieOptions = {
   maxAge: 1 * 24 * 60 * 60 * 1000,
 };
 
+const CSRF_AGE = 15*24*60*1000;
+const REFRESH_AGE = 15*24*60*1000;
+const ACCESS_AGE = 30*60*1000;
+
 export const registerController = async (req: Request, res: Response) => {
-  const body = (req as ValidatedRequest<RegisterInput>).validatedBody;
+  const body =  req.validatedBody as RegisterInput;
 
   const userAgent: string = req.headers["user-agent"] || "unknown";
   const ip =
@@ -42,22 +44,23 @@ export const registerController = async (req: Request, res: Response) => {
 
   const result = await registerUser(payload);
 
-  const { user, accessToken, refreshToken, csrfToken } = result;
+  const { user, tokens } = result;
+  const { accessToken, refreshToken, csrfToken } = tokens;
 
   return res
     .status(200)
     .cookie("access-token", accessToken, {
       ...CookieOptions,
-      maxAge: 30 * 60 * 1000,
+      maxAge: ACCESS_AGE,
     })
     .cookie("refresh-token", refreshToken, {
       ...CookieOptions,
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      maxAge: REFRESH_AGE,
     })
     .cookie("csrf-token", csrfToken, {
       ...CookieOptions,
       httpOnly: false,
-      maxAge: 30 * 24 * 60 * 60 * 1000,
+      maxAge: CSRF_AGE,
     })
     .json({
       user: {
@@ -71,7 +74,7 @@ export const registerController = async (req: Request, res: Response) => {
 };
 
 export const loginController = async (req: Request, res: Response) => {
-  const body = (req as ValidatedRequest<LoginInput>).validatedBody;
+  const body = req.validatedBody as LoginInput;
   const userAgent: string = req.headers["user-agent"] || "unknown";
   const ip =
     req.headers["x-forwarded-for"] ||
@@ -82,22 +85,23 @@ export const loginController = async (req: Request, res: Response) => {
   const payload = { ...body, userAgent, ip };
 
   const result = await loginUser(payload);
-  const { user, accessToken, refreshToken, csrfToken, accountStatus } = result;
+  const { user, tokens } = result;
+  const { accessToken, refreshToken, csrfToken } = tokens;
 
   return res
     .status(200)
     .cookie("access-token", accessToken, {
       ...CookieOptions,
-      maxAge: 30 * 60 * 1000,
+      maxAge: ACCESS_AGE,
     })
     .cookie("refresh-token", refreshToken, {
       ...CookieOptions,
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      maxAge:  REFRESH_AGE,
     })
     .cookie("csrf-token", csrfToken, {
       ...CookieOptions,
       httpOnly: false,
-      maxAge: 30 * 24 * 60 * 60 * 1000,
+      maxAge: CSRF_AGE,
     })
     .json({
       user: {
@@ -106,13 +110,13 @@ export const loginController = async (req: Request, res: Response) => {
         username: user.username,
         displayName: user.displayName,
         avatar: user.avatarUrl,
-        accountStatus: accountStatus,
+        accountStatus: user.accountStatus,
       },
     });
 };
 
 export const forgotPasswordController = async (req: Request, res: Response) => {
-  const payload = (req as ValidatedRequest<ForgetPasswordInput>).validatedBody;
+  const payload = req.validatedBody as ForgetPasswordInput;
   await createPasswordResetRequest(payload.email);
   return res.status(200).json({
     status: "success",
@@ -122,9 +126,7 @@ export const forgotPasswordController = async (req: Request, res: Response) => {
 };
 
 export const resetPasswordController = async (req: Request, res: Response) => {
-  const { token, password } = (
-    req as ValidatedRequest<{ token: string; password: string }>
-  ).validatedBody;
+  const { token, password } = req.validatedBody as { token: string; password: string };
   await resetPassword(token, password);
   return res.status(200).json({
     status: "success",
@@ -150,16 +152,16 @@ export const refreshTokenController = async (req: Request, res: Response) => {
     .status(200)
     .cookie("access-token", accessToken, {
       ...CookieOptions,
-      maxAge: 30 * 60 * 1000,
+      maxAge: ACCESS_AGE,
     })
     .cookie("refresh-token", refreshToken, {
       ...CookieOptions,
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      maxAge: REFRESH_AGE,
     })
     .cookie("csrf-token", csrfToken, {
       ...CookieOptions,
       httpOnly: false,
-      maxAge: 30 * 24 * 60 * 60 * 1000,
+      maxAge: CSRF_AGE,
     })
     .json({ message: "Tokens refreshed" });
 };
@@ -168,7 +170,7 @@ export const emailVerificationController = async (
   req: Request,
   res: Response
 ) => {
-  const userId = (req as AuthenticatedRequest).user?._id;
+  const userId = req?.user!.id
 
   await sendEmailVerification(userId);
   return res.status(200).json({
@@ -177,8 +179,7 @@ export const emailVerificationController = async (
 };
 
 export const verifyEmailController = async (req: Request, res: Response) => {
-  const { verificationToken } = (req as ValidatedRequest<VerifyEmailInput>)
-    .validatedBody;
+  const { verificationToken } = req.validatedBody as VerifyEmailInput;
 
   await verifyEmail(verificationToken);
   return res.status(200).json({
@@ -190,10 +191,8 @@ export const verifyEmailChangeController = async (
   req: Request,
   res: Response
 ) => {
-  const { verificationToken, code } = (
-    req as ValidatedRequest<VerifyUpdateEmailInput>
-  ).validatedBody;
-  const currentSessionId = (req as AuthenticatedRequest).sessionId;
+  const { verificationToken, code } = req.validatedBody as VerifyUpdateEmailInput;
+  const currentSessionId = req?.sessionId;
   await verifyUpdateEmail(verificationToken, code, currentSessionId);
   return res.status(200).json({
     message: "Email change verified successfully",

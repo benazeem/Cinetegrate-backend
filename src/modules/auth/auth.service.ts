@@ -5,8 +5,7 @@ import mongoose, { Types } from "mongoose";
 import { RESET_EXP_MIN } from "constants/authConsts.js";
 import { UserModel, type User } from "@models/User.js";
 import { SessionModel, type Session } from "@models/Session.js";
-import {
-  compareHashTokens,
+import { 
   generateAccessToken,
   generateCsrfToken,
   generateRefreshToken,
@@ -29,7 +28,10 @@ import {
 import sendWelcomeEmail from "@utils/emails/sender/sendWelcomeEmail.js";
 import sendResetLink from "@utils/emails/sender/sendResetLink.js";
 import sendPasswordUpdatedEmail from "@utils/emails/sender/sendPasswordUpdatedEmail.js";
-import sendVerificationEmail from "@utils/emails/sender/sendEmailVerificationLink.js";
+import sendVerificationEmail from "@utils/emails/sender/sendEmailVerificationLink.js"; 
+import ensureActiveAccount from "security/guards/ensureActiveAccount.js"; 
+import { getAccountBlockResponse } from "security/guards/getAccountBlockResponse.js";  
+import { createUserSession } from "./utils/createUserSession.js";
 
 type LoginInputWithMeta = LoginInput & {
   userAgent: string;
@@ -37,19 +39,20 @@ type LoginInputWithMeta = LoginInput & {
 };
 type SignOutput = {
   user: User;
-  accessToken: string;
-  refreshToken: string;
-  csrfToken: string;
-  accountStatus?: string;
+  tokens: {
+    accessToken: string;
+    refreshToken: string;
+    csrfToken: string;
+  }; 
 };
 type RegisterInputWithMeta = RegisterInput & {
   userAgent: string;
   ip: string | string[] | undefined;
 };
-interface RefreshTokenOutput {
-  accessToken: string;
-  refreshToken: string;
-  csrfToken: string;
+interface RefreshTokenOutput {  
+    accessToken: string;
+    refreshToken: string;
+    csrfToken: string; 
 }
 
 export async function registerUser(
@@ -65,10 +68,8 @@ export async function registerUser(
     }
   }
   // Metadata
-  const ipData: any = await getIpInfo(ip as string);
-  const userAgentInfo = parseUserAgent(userAgent);
-
-  const passwordHash = await bcrypt.hash(password, 10);
+  
+  const passwordHash = await bcrypt.hash(password, 10); 
 
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -88,30 +89,15 @@ export async function registerUser(
     );
     const user: User = result[0];
 
-    const sessionId: string = crypto.randomBytes(32).toString("hex");
-    const accessToken = generateAccessToken(user._id, sessionId);
-    const refreshToken = generateRefreshToken(user._id, sessionId);
-    const csrfToken = generateCsrfToken();
+    const { sessionPayload, tokens } = await createUserSession({
+  user,
+  userAgent,
+  ip: (Array.isArray(ip) ? ip[0] : ip) || "",
+}); 
     await SessionModel.create(
       [
         {
-          sessionId,
-          userId: user._id,
-          userAgent,
-          device: userAgentInfo.device,
-          browser: userAgentInfo.browser,
-          os: userAgentInfo.os,
-          ip: ipData.ip,
-          city: ipData.cityName,
-          country: ipData.countryName,
-          timezone: ipData.timeZones[0],
-          lat: ipData.latitude,
-          lng: ipData.longitude,
-          isp: ipData.asnOrganisation,
-          refreshTokenHash: hashToken(refreshToken),
-          csrfTokenHash: hashToken(csrfToken),
-          createdAt: Date.now(),
-          lastUsedAt: Date.now(),
+          ...sessionPayload
         },
       ],
       { session }
@@ -119,7 +105,7 @@ export async function registerUser(
     await session.commitTransaction();
     // enqueue welcome email
     sendWelcomeEmail(user.email, user.displayName, user.username);
-    return { user, accessToken, refreshToken, csrfToken };
+    return { user, tokens };
   } catch (err) {
     await session.abortTransaction();
     const errorMessage = err instanceof Error ? err.message : String(err);
@@ -132,7 +118,7 @@ export async function registerUser(
 
 export async function loginUser(
   input: LoginInputWithMeta
-): Promise<SignOutput> {
+): Promise<SignOutput  > {
   const { email, password, userAgent, ip } = input;
 
   const user: User | null = await UserModel.findOne({ email }).select(
@@ -141,53 +127,33 @@ export async function loginUser(
   if (!user) {
     throw new UnauthenticatedError("Email or Password does not match!");
   }
-
+  const active = ensureActiveAccount(user);
+  if(!active) {
+   const status = user.accountStatus;
+   const errorResponse = getAccountBlockResponse(status);
+   if (errorResponse) {
+    throw new ForbiddenError(errorResponse.message, {
+      reason: errorResponse.reason,
+      nextStep: errorResponse.nextStep,
+    })
+   }
+    throw new UnauthenticatedError("Not allowed to login.");
+  }
+  
   const passedTest = await bcrypt.compare(password, user.passwordHash);
   if (!passedTest) {
     throw new UnauthenticatedError("Email or Password does not match!");
-  }
-  const lastStatusChange = user.changeHistory
-    .filter((change) => change.field === "accountStatus")
-    .sort((a, b) => b.at.getTime() - a.at.getTime())[0];
-
-  if (user.accountStatus === "banned") {
-    throw new ForbiddenError("This account has been permanently banned.");
-  }
-  if (user.accountStatus === "deactive" || user.accountStatus === "suspend") {
-    if (lastStatusChange.via === "admin") {
-      throw new ForbiddenError(
-        `Account is ${user.accountStatus} by admin. Please contact support.`
-      );
-    }
-  }
-  const ipData: any = await getIpInfo(ip as string);
-  const userAgentInfo = parseUserAgent(userAgent);
-  const sessionId: string = crypto.randomBytes(32).toString("hex");
-
-  const accessToken = generateAccessToken(user._id, sessionId);
-  const refreshToken = generateRefreshToken(user._id, sessionId);
-  const csrfToken = generateCsrfToken();
-  await SessionModel.create({
-    sessionId,
-    userId: user._id,
+  } 
+  
+ 
+  const { sessionPayload, tokens } = await createUserSession({
+    user,
     userAgent,
-    device: userAgentInfo.device,
-    browser: userAgentInfo.browser,
-    os: userAgentInfo.os,
-    ip: ipData.ip,
-    city: ipData.cityName,
-    country: ipData.countryName,
-    timezone: ipData.timeZones[0],
-    lat: ipData.latitude,
-    lng: ipData.longitude,
-    isp: ipData.asnOrganization,
-    refreshTokenHash: hashToken(refreshToken),
-    csrfTokenHash: hashToken(csrfToken),
-    createdAt: Date.now(),
-    lastUsedAt: Date.now(),
-  });
+    ip: (Array.isArray(ip) ? ip[0] : ip) || "",
+  }); 
+ await SessionModel.create(sessionPayload);
 
-  return { user, accessToken, refreshToken, csrfToken };
+  return { user, tokens };
 }
 
 export async function refreshTokens(
@@ -195,72 +161,102 @@ export async function refreshTokens(
   userAgent: string,
   ip: string | string[] | undefined
 ): Promise<RefreshTokenOutput> {
-  let decoded;
+  let decoded: {
+    userId: string;
+    sessionId: string;
+    role: "user" | "admin";
+  };
+
   try {
-    decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET!) as {
-      userId: string;
-      sessionId: string;
-    };
-  } catch (err) {
+    decoded = jwt.verify(
+      refreshToken,
+      process.env.REFRESH_TOKEN_SECRET!
+    ) as typeof decoded;
+  } catch {
     throw new UnauthenticatedError("Authentication failed");
-  } 
+  }
 
   const session = await SessionModel.findOne({
     sessionId: decoded.sessionId,
     userId: decoded.userId,
-  }).select("+refreshTokenHash +valid +revokedAt");
+    valid: true,
+    revokedAt: null,
+  }).select("+refreshTokenHash +csrfTokenHash +expiresIn");
 
-  const user: User | null = await UserModel.findOne({
-    _id: decoded.userId,
-  });
-
-  if (
-    !decoded ||
-    !user ||
-    !session ||
-    !session.valid ||
-    session.revokedAt ||
-    !session.refreshTokenHash
-  ) {
+  if (!session || !session.refreshTokenHash || !session.expiresIn) {
     throw new UnauthenticatedError("Authentication failed");
   }
 
-  const refreshCookieHash = hashToken(refreshToken);
-  const isValidToken = compareHashTokens(
-    refreshCookieHash,
-    session.refreshTokenHash
-  );
-
-  if (
-    !isValidToken ||
-    // session.userAgent !== userAgent ||
-    // session.country !== ipData.countryName ||
-    user.accountStatus !== "active"
-  ) {
+  // hard session expiry (absolute TTL)
+  if (session.expiresIn.getTime() <= Date.now()) {
     await SessionModel.updateOne(
       { _id: session._id },
       { valid: false, revokedAt: new Date() }
     ).exec();
+
+    throw new UnauthenticatedError("Authentication failed: Session expired");
+  }
+
+  // verify refresh token (CORRECT ORDER)
+  const isValidToken = verifyToken(
+    refreshToken,
+    session.refreshTokenHash
+  );
+
+  if (!isValidToken) {
+    await SessionModel.updateOne(
+      { _id: session._id },
+      { valid: false, revokedAt: new Date() }
+    ).exec();
+
     throw new UnauthenticatedError(
-      "Authentication failed:Session Revoked due to malicious behaviour"
+      "Authentication failed: Session revoked"
     );
   }
 
-  const accessToken = generateAccessToken(user._id, session.sessionId);
-  const newRefreshToken = generateRefreshToken(user._id, session.sessionId); 
-  const csrfToken = generateCsrfToken();
-  
- 
-    await SessionModel.updateOne(
-      { _id: session._id },
-      {
-        lastUsedAt: new Date(),
-        refreshTokenHash: hashToken(newRefreshToken),
-        csrfTokenHash: hashToken(csrfToken),
-      }
-    ) 
-    
-  return { accessToken, refreshToken: newRefreshToken, csrfToken };
+  const user = await UserModel.findOne({
+    _id: decoded.userId,
+    accountStatus: { $ne: "banned" },
+  });
+
+  if (!user) {
+    throw new UnauthenticatedError("Authentication failed");
+  }
+
+  // rotate tokens
+  const newAccessToken = generateAccessToken(
+    user._id,
+    session.sessionId,
+    user.role,
+    user.accountStatus
+  );
+
+  const newRefreshToken = generateRefreshToken(
+    user._id,
+    session.sessionId
+  );
+
+  const newCsrfToken = generateCsrfToken();
+
+  await SessionModel.updateOne(
+    {
+      _id: session._id,
+      refreshTokenHash: session.refreshTokenHash, // race protection
+    },
+    {
+      refreshTokenHash: hashToken(newRefreshToken),
+      csrfTokenHash: hashToken(newCsrfToken),
+      lastUsedAt: new Date(),
+      userAgent,
+      ip: Array.isArray(ip) ? ip[0] : ip,
+    }
+  ).exec();
+
+  return {
+    accessToken: newAccessToken,
+    refreshToken: newRefreshToken,
+    csrfToken: newCsrfToken,
+  };
 }
 
 export async function createPasswordResetRequest(email: string) {
@@ -322,20 +318,16 @@ export async function resetPassword(rawToken: string, newPassword: string) {
   ) {
     throw new BadRequestError("Invalid or expired token");
   }
-
-  const removePasswordReset = async () => {
-    user.passwordReset = undefined;
+ 
+  if (user.passwordReset.expiresAt.getTime() < Date.now()) {
+   user.passwordReset = undefined;
     await user.save();
     throw new BadRequestError("Invalid or expired token");
-  };
-
-  if (user.passwordReset.expiresAt.getTime() < Date.now()) {
-    removePasswordReset();
   }
 
   const isValid = verifyToken(rawToken, user.passwordReset.tokenHash);
   if (!isValid) {
-    removePasswordReset();
+     throw new BadRequestError("Invalid or expired token");
   }
 
   const hashedPassword = await bcrypt.hash(newPassword, 10);
@@ -392,7 +384,7 @@ export async function resetPassword(rawToken: string, newPassword: string) {
 }
 
 export async function sendEmailVerification(
-  userId: Types.ObjectId
+  userId: string
 ): Promise<void> {
   const user: User | null = await UserModel.findById(userId).select(
     "+emailVerification +changeHistory"
@@ -400,9 +392,14 @@ export async function sendEmailVerification(
   if (!user) {
     throw new NotFoundError("User not found");
   }
+   const active = ensureActiveAccount(user);
+   if(!active) {
+    throw new ForbiddenError("Account is not active");
+  } 
   if (user.emailVerified) {
     throw new ConflictError("Email is already verified");
   }
+ 
   const token = generateVerificationToken();
 
   const verifyEmailUrl = `${
@@ -446,6 +443,10 @@ export async function verifyEmail(verificationToken: string): Promise<void> {
   }).select("+emailVerification +changeHistory");
   if (!user) {
     throw new BadRequestError("Invalid or expired verification token");
+  }
+  const active = ensureActiveAccount(user);
+  if(!active) {
+    throw new ForbiddenError("Account is not active");
   }
 
   if (
@@ -501,6 +502,10 @@ export async function verifyUpdateEmail(
   }).select("+pendingEmailChange +changeHistory");
   if (!user) {
     throw new BadRequestError("Invalid or expired verification token");
+  }
+  const active = ensureActiveAccount(user);
+  if(!active) {
+    throw new ForbiddenError("Account is not active");
   }
   if (
     !user.pendingEmailChange ||

@@ -1,35 +1,44 @@
-import type { Request, Response, NextFunction } from "express";
-import crypto from "crypto";
-import { BadRequestError } from "@middleware/error/index.js";
-import { SessionModel } from "@models/Session.js";
-import { AuthenticatedRequest } from "types/RequestTypes.js";
-import { compareHashTokens, hashToken } from "@utils/tokens.js";
+import type { Request, Response, NextFunction } from "express"; 
+import {  UnauthorizedError } from "@middleware/error/index.js";
+import { SessionModel } from "@models/Session.js"; 
+import {  verifyToken } from "@utils/tokens.js";
+import { ALLOWED_ORIGINS } from "constants/globalConts.js";
 
 export const csrfMiddleware = async (
   req: Request,
   res: Response,
   next: NextFunction
-) => {
-  const csrfCookie = req.cookies["csrf-token"];
-  const csrfToken = req.headers["x-csrf-token"]; 
-  if (!csrfToken || !csrfCookie) {
-    throw new BadRequestError(
-      "Invalid CSRF token"
-    );
-  }
+) => { 
+   const unsafeMethods = ["POST", "PUT", "PATCH", "DELETE"];
+if (!unsafeMethods.includes(req.method)) {
+  return next();
+} 
 
+const origin = req.headers.origin; 
+if (!origin && !ALLOWED_ORIGINS.includes(origin as string)) {
+  throw new UnauthorizedError("Invalid origin");
+}
+ 
+  const csrfToken = req.headers["x-csrf-token"]; 
+  if (!csrfToken) {
+    throw new UnauthorizedError();
+  } 
+  const csrfTokenValue = Array.isArray(csrfToken) ? csrfToken[0] : csrfToken;
+   
   const session = await SessionModel.findOne({
-    csrfTokenHash: hashToken(csrfCookie),
+      sessionId: req.sessionId,
+    valid: true,
+  revokedAt: null, 
   }).select("+csrfTokenHash"); 
   
   if (!session) {
-    throw new BadRequestError("Invalid CSRF token");
+    throw new UnauthorizedError();
   }
-  const hashCsrfToken = hashToken(csrfToken as string);
-  const isValid = compareHashTokens(session.csrfTokenHash, hashCsrfToken);
+ 
+  const isValid = verifyToken(csrfTokenValue,session.csrfTokenHash);
   if (!isValid) {
-    throw new BadRequestError("Invalid CSRF token");
+    throw new UnauthorizedError();
   }
 
-  next();
+ next()
 };

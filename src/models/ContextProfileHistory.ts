@@ -1,5 +1,4 @@
-import { Schema, model, Document, Types } from "mongoose";
-import { VideoDefaults, AudioDefaults } from "./ContextProfile.js";
+import { Schema, model, Document, Types } from "mongoose"; 
 
 export interface ContextProfileHistory extends Document {
   contextProfileId: Types.ObjectId;
@@ -18,9 +17,7 @@ export interface ContextProfileHistory extends Document {
       description?: string;
     }[];
     narrativeConstraints?: string;
-    forbiddenElements?: string[];
-    audioDefaults?: AudioDefaults;
-    videoConfigDefaults?: VideoDefaults;
+    forbiddenElements?: string[]; 
   };
 
   changeReason?: string; // optional user/system note
@@ -71,33 +68,7 @@ const contextProfileHistorySchema = new Schema<ContextProfileHistory>(
       forbiddenElements: {
         type: [String],
         default: [],
-      },
-      audioDefaults: {
-        voiceId: String,
-        gender: {
-          type: String,
-          enum: ["male", "female", "neutral"],
-        },
-        language: String,
-        accent: String,
-        tone: {
-          type: String,
-          enum: ["neutral", "calm", "dramatic", "eerie"],
-        },
-        pacing: {
-          type: String,
-          enum: ["slow", "medium", "fast"],
-        },
-        emotionBias: {
-          type: String,
-          enum: ["flat", "expressive", "subtle"],
-        },
-      },
-
-      videoConfigDefaults: {
-        fps: Number,
-        quality: String,
-      },
+      }, 
     },
 
     changeReason: {

@@ -16,7 +16,12 @@ AppRouter.use(helmet());
 const corsOptions = getCorsConfig();
 AppRouter.use(cors(corsOptions));
 
-AppRouter.use(cookieParser());
+AppRouter.use(cookieParser()); 
+
+AppRouter.use((_req, res, next) => {
+  res.setHeader("X-Debug-Server", process.pid.toString());
+  next();
+}); 
 
 // Basic logger
 AppRouter.use(requestLogger);

@@ -32,6 +32,7 @@ const sessionSchema = new Schema({
   engine: { type: String },
   refreshTokenHash: { type: String, required: true },
   csrfTokenHash: { type: String, required: true },
+  expiresIn: { type: Date, required: true },
   createdAt: { type: Date, default: Date.now },
   lastUsedAt: { type: Date, default: Date.now },
   revokedAt: { type: Date, default: null },
@@ -42,7 +43,8 @@ const sessionSchema = new Schema({
 sessionSchema.index(
   { lastUsedAt: 1 },
   { expireAfterSeconds: 30 * 24 * 60 * 60 }
-);
+); 
+//TTL index: automatically remove revoked sessions after 7 days 
 sessionSchema.index(
   { revokedAt: 1 },
   {

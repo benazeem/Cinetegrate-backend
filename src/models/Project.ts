@@ -4,10 +4,8 @@ export interface ProjectType extends Document {
   title: string;
   description: string;
   status: "active" | "draft" | "archive" | "delete";
-  visibility: "public" | "private";
-  contextProfileId?: Types.ObjectId;
-  activeStoryId?: Types.ObjectId;
-  activeStoryGeneratedAt?: Date;
+  visibility: "public" | "private";  
+  defaultContextProfileId?: Types.ObjectId; 
   generationCounts: {
     storiesGenerated: number;
     scenesGenerated: number;
@@ -47,10 +45,8 @@ const projectSchema = new Schema<ProjectType>(
       type: String,
       enum: ["public", "private"],
       default: "private",
-    },
-    contextProfileId: { type: Schema.Types.ObjectId, ref: "ContextProfile" },
-    activeStoryId: { type: Schema.Types.ObjectId, ref: "Story" },
-    activeStoryGeneratedAt: { type: Date },
+    }, 
+    defaultContextProfileId: { type: Schema.Types.ObjectId, ref: "ContextProfile" }, 
     generationCounts: {
       storiesGenerated: { type: Number, default: 0 },
       scenesGenerated: { type: Number, default: 0 },

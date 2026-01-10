@@ -21,8 +21,7 @@ import {
 import { validateBody } from "@validation/validateBody.js";
 import { asyncHandler } from "@utils/asyncHandler.js";
 import { authMiddleware } from "@middleware/auth/requireAuth.js";
-import { csrfMiddleware } from "@middleware/security/requireCsrf.js";
-import { requireActiveAccount } from "@middleware/security/accountStatusMiddleware.js";
+import { csrfMiddleware } from "@middleware/security/requireCsrf.js";  
 
 const router = Router();
 
@@ -30,8 +29,7 @@ router.post(
   "/register",
   validateBody(registerSchema),
   asyncHandler(registerController)
-);
-
+); 
 router.post("/login", validateBody(loginSchema), asyncHandler(loginController));
 router.post(
   "/forgot-password",
@@ -45,31 +43,28 @@ router.post(
   asyncHandler(resetPasswordController)
 );
 
+
 router.post(
-  "/refresh-token",
-  csrfMiddleware,
+  "/refresh-session", 
   asyncHandler(refreshTokenController)
 );
 
 router.post(
   "/email/verification",
-  authMiddleware,
-  requireActiveAccount,
+  authMiddleware, 
   asyncHandler(emailVerificationController)
 );
 
 router.post(
   "/email/verify",
-  authMiddleware,
-  requireActiveAccount,
+  authMiddleware, 
   validateBody(verifyEmailSchema),
   asyncHandler(verifyEmailController)
 );
 
 router.post(
   "/email/verify-change",
-  authMiddleware,
-  requireActiveAccount,
+  authMiddleware, 
   validateBody(verifyUpdateEmailSchema),
   asyncHandler(verifyEmailChangeController)
 );

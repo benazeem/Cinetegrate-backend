@@ -1,9 +1,8 @@
-import { AccountStatus } from "constants/authConsts.js";
+
 import bcrypt from "bcrypt";
 import {
   BadRequestError,
-  ConflictError,
-  ForbiddenError,
+  ConflictError, 
   InternalServerError,
   NotFoundError,
   UnauthenticatedError,
@@ -16,13 +15,12 @@ import {
   UpdatePrivacySettingsType,
 } from "@validation/user.schema.js";
 import mongoose, { Types } from "mongoose";
-import { generateVerificationToken, verifyToken } from "@utils/tokens.js";
-import transporter from "config/mail.js";
-import { verifyUpdatedEmailTemplate } from "../../utils/emails/templates/verifyUpdatedEmail.js";
-import sendUpdateEmailLink from "@utils/emails/sender/sendUpdateEmaiLink.js";
+import { generateVerificationToken, verifyToken } from "@utils/tokens.js"; 
+import sendUpdateEmailLink from "@utils/emails/sender/sendUpdateEmailLink.js";
 import sendOldEmailVerificationForEmailUpdate from "@utils/emails/sender/sendOldEmailVerificationForEmailUpdate.js";
+import { generateAllCookieTokens } from "@utils/generateAllCookieTokens.js";
 
-export const getProfile = async (userId: Types.ObjectId): Promise<User> => {
+export const getProfile = async (userId: string): Promise<User> => {
   const user = await UserModel.findById(userId)
     .select(
       "-passwordHash -emailVerificationToken -resetPasswordToken -createdAt -updatedAt"
@@ -40,7 +38,7 @@ export const getProfile = async (userId: Types.ObjectId): Promise<User> => {
 };
 
 export const updateProfile = async (
-  userId: Types.ObjectId,
+  userId: string,
   updateData: Partial<User>
 ): Promise<Partial<User>> => {
   const user = await UserModel.findByIdAndUpdate(userId, updateData, {
@@ -55,7 +53,7 @@ export const updateProfile = async (
 };
 
 export const updateAvatar = async (
-  userId: Types.ObjectId,
+  userId: string,
   avatarData: Express.Multer.File | undefined
 ): Promise<Partial<User>> => {
   if (!avatarData) {
@@ -79,7 +77,7 @@ export const updateAvatar = async (
   return resUser;
 };
 
-export const deleteAvatar = async (userId: Types.ObjectId): Promise<void> => {
+export const deleteAvatar = async (userId: string): Promise<void> => {
   const user = await UserModel.findById(userId);
   if (!user) {
     throw new NotFoundError("User not found");
@@ -105,7 +103,7 @@ export const deleteAvatar = async (userId: Types.ObjectId): Promise<void> => {
 };
 
 export const getSettings = async (
-  userId: Types.ObjectId
+  userId: string
 ): Promise<Partial<User>> => {
   const user = await UserModel.findById(userId).select(
     "emailNotifications privacySettings"
@@ -118,7 +116,7 @@ export const getSettings = async (
 };
 
 export const getSecurity = async (
-  userId: Types.ObjectId
+  userId: string
 ): Promise<Partial<User>> => {
   const user = await UserModel.findById(userId).select(
     "email phoneNumber passwordHash emailVerified phoneVerified lastPasswordChangeAt twoFactorEnabled oauthProviders"
@@ -131,7 +129,7 @@ export const getSecurity = async (
 };
 
 export const getSessions = async (
-  userId: Types.ObjectId,
+  userId: string,
   sessioId: string
 ): Promise<
   Array<{
@@ -168,7 +166,7 @@ export const getSessions = async (
 };
 
 export const getBilling = async (
-  userId: Types.ObjectId
+  userId: string
 ): Promise<Partial<User>> => {
   const user = await UserModel.findById(userId).select("plan billingInfo");
   if (!user) {
@@ -179,7 +177,7 @@ export const getBilling = async (
 };
 
 export const updateNotifications = async (
-  userId: Types.ObjectId,
+  userId: string,
   notificationPrefs: UpdateNotificationsType
 ): Promise<Partial<User>> => {
   const update: Record<string, any> = {};
@@ -210,7 +208,7 @@ export const updateNotifications = async (
 };
 
 export const updatePrivacySettings = async (
-  userId: Types.ObjectId,
+  userId: string,
   privacyPrefs: UpdatePrivacySettingsType
 ): Promise<Partial<User>> => {
   const update: Record<string, any> = {};
@@ -241,7 +239,7 @@ export const updatePrivacySettings = async (
 };
 
 export const updatePassword = async (
-  userId: Types.ObjectId,
+  userId: string,
   currentPassword: string,
   newPassword: string
 ): Promise<void> => {
@@ -273,7 +271,7 @@ export const updatePassword = async (
 };
 
 export const updateEmail = async (
-  userId: Types.ObjectId,
+  userId: string,
   newEmail: string
 ): Promise<void> => {
   const user = await UserModel.findById(userId);
@@ -315,7 +313,7 @@ export const updateEmail = async (
 };
 
 export const deleteSession = async (
-  userId: Types.ObjectId,
+  userId: string,
   sessionId: string
 ): Promise<void> => {
   const session = await SessionModel.findOne({
@@ -337,7 +335,7 @@ export const deleteSession = async (
 };
 
 export const deleteAllSessions = async (
-  userId: Types.ObjectId,
+  userId: string,
   currentSessionId: string,
   removeCurrent: boolean | undefined
 ): Promise<void> => {
@@ -353,7 +351,7 @@ export const deleteAllSessions = async (
   return;
 };
 
-export const deleteAccount = async (userId: Types.ObjectId): Promise<void> => {
+export const deleteAccount = async (userId: string): Promise<void> => {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
@@ -393,11 +391,14 @@ export const deleteAccount = async (userId: Types.ObjectId): Promise<void> => {
 };
 
 export const reactivateAccount = async (
-  userId: Types.ObjectId
+  userId: string
 ): Promise<Partial<User>> => {
   const user = await UserModel.findById(userId).select("+changeHistory +role");
   if (!user) {
     throw new NotFoundError("User not found");
+  }
+  if(user.accountStatus !== "deactive" && user.accountStatus !== "delete"){
+    throw new BadRequestError("Account is not deactivated or deleted other than that cannot be reactivated. Contact support.");
   }
   const updatedUser = await UserModel.findByIdAndUpdate(
     userId,
@@ -427,11 +428,12 @@ export const reactivateAccount = async (
     throw new NotFoundError("User not found");
   }
   const resUser = returnUserData(updatedUser, "profile");
+  
   return resUser;
 };
 
 export const deactivateAccount = async (
-  userId: Types.ObjectId
+  userId: string
 ): Promise<Partial<User>> => {
   const user = await UserModel.findById(userId).select("+changeHistory +role");
   if (!user) {

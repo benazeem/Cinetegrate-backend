@@ -67,7 +67,7 @@ const finalVideoSchema = new Schema<FinalVideo>(
       type: Schema.Types.ObjectId,
       ref: "Project",
       required: true,
-      indexe: true,
+      index: true,
     },
     storyId: {
       type: Schema.Types.ObjectId,

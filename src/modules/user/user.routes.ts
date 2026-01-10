@@ -1,6 +1,5 @@
 import { Router } from "express";
 import { asyncHandler } from "@utils/asyncHandler.js";
-import { csrfMiddleware } from "@middleware/security/requireCsrf.js";
 import {
   deleteAvatarController,
   getBillingController,
@@ -18,6 +17,7 @@ import {
   deleteAllSessionsController,
   deleteAccountController,
   deactivateAccountController,
+  reactivateAccountController,
 } from "./user.controller.js";
 import {
   deleteAllSessionsSchema,
@@ -30,12 +30,12 @@ import {
 } from "@validation/user.schema.js";
 import { validateBody } from "@validation/validateBody.js";
 import { validateParams } from "@validation/validateParams.js";
-import { avatarUpload } from "@middleware/avatarUpload.js";
-import { requireActiveAccount } from "@middleware/security/accountStatusMiddleware.js";
+import { avatarUpload } from "@middleware/avatarUpload.js";  
+import { requireActiveAccount } from "@middleware/security/requireActiveAccount.js";
 
 const router = Router();
 
-router.patch("/account/reactivate", asyncHandler(deleteAccountController));
+router.patch("/account/reactivate", asyncHandler(reactivateAccountController)); 
 
 router.use(requireActiveAccount);
 router.get("/profile", asyncHandler(getProfileController));
@@ -43,8 +43,7 @@ router.get("/settings", asyncHandler(getSettingsController));
 router.get("/security", asyncHandler(getSecurityController));
 router.get("/sessions", asyncHandler(getSessionsController));
 router.get("/billing", asyncHandler(getBillingController));
-
-router.use(csrfMiddleware);
+ 
 router.patch(
   "/profile",
   validateBody(updateProfileSchema),
@@ -91,5 +90,6 @@ router.delete(
 
 router.patch("/account/deactivate", asyncHandler(deactivateAccountController));
 router.delete("/account/delete", asyncHandler(deleteAccountController));
+// Request Hard Account Data Deletion Route can be added here in the future
 
 export default router;

@@ -1,5 +1,6 @@
-import { Router } from "express";
+ import { Router } from "express";
 import {
+  createProjectContextProfileController,
   deleteProjectByIdController,
   getArchivedProjectsController,
   getDeletedProjectsController,
@@ -17,6 +18,7 @@ import {
 import { asyncHandler } from "@utils/asyncHandler.js";
 import { validateBody } from "@validation/validateBody.js";
 import {
+  createProjectContextProfileSchema,
   createProjectSchema,
   projectIdParamSchema,
   updateManyIdsSchema,
@@ -25,17 +27,18 @@ import {
   updateProjectVisibilitySchema,
 } from "@validation/project.schema.js";
 import { validateParams } from "@validation/validateParams.js";
+import { paginationAndSortingMiddleware } from "@middleware/paginationAndSorting.js"; 
 
 const router = Router();
 
-router.get("/", asyncHandler(getProjectsController));
+router.get("/", paginationAndSortingMiddleware, asyncHandler(getProjectsController));
 router.post(
   "/",
   validateBody(createProjectSchema),
   asyncHandler(postProjectController)
 );
-router.get("/deleted", asyncHandler(getDeletedProjectsController));
-router.get("/archived", asyncHandler(getArchivedProjectsController));
+router.get("/deleted", paginationAndSortingMiddleware, asyncHandler(getDeletedProjectsController));
+router.get("/archived", paginationAndSortingMiddleware, asyncHandler(getArchivedProjectsController));
 router.patch(
   "/restore",
   validateBody(updateManyIdsSchema),
@@ -46,14 +49,18 @@ router.patch(
   validateBody(updateManyIdsSchema),
   asyncHandler(unarchiveManyProjectsController)
 );
-
-
-
+ 
+// Project ID specific routes
 router.get(
   "/:projectId",
   validateParams(projectIdParamSchema),
   asyncHandler(getProjectByIdController)
 );
+router.post(
+  "/:projectId/context-profile",
+  validateParams(projectIdParamSchema),
+  validateBody(createProjectContextProfileSchema),
+  asyncHandler(createProjectContextProfileController));
 router.patch(
   "/:projectId",
   validateParams(projectIdParamSchema),
@@ -87,10 +94,5 @@ router.patch(
   validateParams(projectIdParamSchema),
   asyncHandler(unarchiveProjectByIdController)
 );
-// Routes which go from a single project
-// router.use("/projects/:projectId", contextRouter);
-// router.use("/projects/:projectId", storyRouter);
-// router.use("/projects/:projectId", assetRouter);
-// router.use("/projects/:projectId", videosRouter); // finally videos routes
 
 export default router;

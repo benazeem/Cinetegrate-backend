@@ -1,4 +1,3 @@
-import { InternalServerError } from "@middleware/error/index.js";
 import { User } from "@models/User.js";
 import transporter from "config/mail.js";
 import { emailVerificationTemplate } from "../templates/emailVerification.js";

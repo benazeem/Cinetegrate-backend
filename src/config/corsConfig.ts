@@ -1,11 +1,7 @@
+import { ALLOWED_ORIGINS } from 'constants/globalConts.js';
 import type { CorsOptions } from 'cors';
 
-// Define the exact origin of your frontend for each environment
-// It's best practice to load these from environment variables (e.g., using 'dotenv')
-const DEV_ORIGIN = process.env.DEV_CLIENT_URL || 'http://localhost:3000'; 
-const PROD_ORIGIN = process.env.PROD_CLIENT_URL || 'https://your-production-app.com'; 
-
-/**
+ /**
  * Returns the appropriate CORS configuration based on the current environment.
  * @returns CorsOptions object for the Express 'cors' middleware.
  */
@@ -16,7 +12,7 @@ const getCorsConfig = (): CorsOptions => {
     // Determine the allowed origin
     // In production, strictly use the production URL.
     // In any other environment (development, staging, test), use the development URL.
-    const allowedOrigin = isProduction ? PROD_ORIGIN : DEV_ORIGIN;
+    const allowedOrigin = ALLOWED_ORIGINS;
 
     return {
         // Set the dynamic origin
@@ -24,7 +20,7 @@ const getCorsConfig = (): CorsOptions => {
         
         // Define allowed interactions
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-        allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+        allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-CSRF-Token'],
         
         
         // Allow cookies or authorization headers to be sent

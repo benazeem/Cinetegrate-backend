@@ -1,5 +1,6 @@
 import {
   BadRequestError, 
+  ForbiddenError, 
   InternalServerError,
   NotFoundError,
 } from "@middleware/error/index.js";
@@ -12,13 +13,15 @@ import {
   sanitizeProjectResponse,
   sanitizeProjects,
 } from "@utils/sanitizeProjectResponse.js";
-import { Types } from "mongoose";
+import mongoose, { Types } from "mongoose";
 import { Pagination, Sorting } from "../../types/Pagination.js";
 import {
   ACTIVE_STATUSES, 
 } from "./rules/projectStatus.js";
 import { transitionManyProjectsByIds } from "./utils/transitionManyProjectsByIds.js";
 import { transitionProjectById } from "./utils/transitionProjectById.js";
+import { ContextProfileModel, ContextScope, GenreType } from "@models/ContextProfile.js";
+import { NARRATION_PROFILES } from "constants/narrationProfiles.js";
 
 export async function getProjects(
   userId: Types.ObjectId | string,
@@ -115,6 +118,88 @@ export async function getProjectById(
     project: project,
     type: "getProjectById",
   });
+}
+
+export async function createProjectContextProfile(
+  userId: string,
+  projectId: string,
+  payload: any
+) {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const project = await ProjectModel.findOne({
+      _id: projectId,
+      userId,
+    }).session(session);
+
+    if (!project) throw new Error("Project not found");
+
+    // 🚨 CRITICAL RULE
+    if (project.defaultContextProfileId) {
+      throw new ForbiddenError("Project already has a default context");
+    } 
+    let contextProfileId;
+ 
+    if (payload.mode === "new") {
+      const narrationProfile = NARRATION_PROFILES[payload.data.genre as GenreType]; 
+      const [context] = await ContextProfileModel.create(
+        [
+          {
+            userId,
+            projectId,
+            name: payload.data.name,
+            genre: payload.data.genre,
+            mood: payload.data.mood,
+            style: payload.data.style,
+            environment: payload.data.environment,
+            narrationProfile,
+            scope: ContextScope.PROJECT,
+            isDefaultForProject: true,
+            lastUsedAt: new Date(),
+          },
+        ],
+        { session }
+      ); 
+      contextProfileId = context._id;
+    }
+ 
+    if (payload.mode === "use-global") {
+      const globalContext = await ContextProfileModel.findOne({
+        _id: payload.globalContextId,
+        scope: ContextScope.GLOBAL,
+      }).session(session);
+
+      if (!globalContext) {
+        throw new Error("Global context not found");
+      }
+
+      // 🔒 CLONE — NEVER ATTACH DIRECTLY
+      const cloned = new ContextProfileModel({
+        ...globalContext.toObject(),
+        _id: undefined,
+        projectId,
+        parentContextId: globalContext._id,
+        scope: ContextScope.PROJECT,
+        isDefaultForProject: true,
+        lastUsedAt: new Date(),
+      });
+
+      await cloned.save({ session });
+      contextProfileId = cloned._id;
+    }
+
+    project.defaultContextProfileId = contextProfileId;
+    await project.save({ session }); 
+    await session.commitTransaction();
+    return project;
+  } catch (err) {
+    await session.abortTransaction();
+    throw err;
+  } finally {
+    session.endSession();
+  }
 }
 
 export async function updateProjectById(

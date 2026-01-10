@@ -1,6 +1,10 @@
 export class AppError extends Error {
   statusCode: number;
   code: string;
+  actions?: {
+    reason: string;
+    nextStep: string;
+  };
   isOperational: boolean;
   details?: any;
   stackTrace?: string;
@@ -9,12 +13,18 @@ export class AppError extends Error {
     message: string,
     statusCode: number,
     code: string,
+    actions?: {
+      reason: string;
+      nextStep: string;
+    },
     details?: any
   ) {
     super(message);
 
+    this.name = this.constructor.name;
     this.statusCode = statusCode;
     this.code = code;
+    this.actions = actions; // optional now
     this.isOperational = true;
     this.details = details;
 
@@ -32,10 +42,15 @@ export class AppError extends Error {
   }
 
   serialize() {
-    const base = {
+    const base: any = {
       error: this.code,
       message: this.message,
     };
+
+    // Only include actions if they exist
+    if (this.actions) {
+      base.actions = this.actions;
+    }
 
     if (process.env.NODE_ENV === "development") {
       return {

@@ -1,6 +1,8 @@
 import jwt, { type SignOptions } from "jsonwebtoken";
 import crypto from "crypto";
 import type { Types } from "mongoose";
+import { UnauthenticatedError } from "@middleware/error/index.js";
+import { AccountStatus } from "@constants/userConts.js";
 
 const ACCESS_TOKEN_EXPIRES_IN: SignOptions["expiresIn"] = process.env
   .ACCESS_TOKEN_EXPIRES_IN as SignOptions["expiresIn"];
@@ -28,7 +30,7 @@ export function verifyToken(rawToken: string, tokenHash: string) {
     tokenHashBuffer.length !== providedHashBuffer.length ||
     !crypto.timingSafeEqual(tokenHashBuffer, providedHashBuffer)
   ) {
-    throw new Error("Invalid or expired token");
+    throw new UnauthenticatedError("Invalid or expired token");
   }
 
   return true;
@@ -53,14 +55,15 @@ export function hashToken(rawToken: string) {
 export function generateSessionId() {
   return crypto.randomBytes(32).toString("hex");
 }
-export function generateAccessToken(userId: Types.ObjectId, sessionId: string) {
-  return jwt.sign({ userId, sessionId }, ACCESS_TOKEN_SECRET, {
+export function generateAccessToken(userId: Types.ObjectId, sessionId: string, role: string, accountStatus?: AccountStatus) {
+  return jwt.sign({ userId, sessionId, role, accountStatus }, ACCESS_TOKEN_SECRET, {
     expiresIn: ACCESS_TOKEN_EXPIRES_IN,
   });
 }
 export function generateRefreshToken(
   userId: Types.ObjectId,
-  sessionId: string
+  sessionId: string,
+  reduceTime: boolean = false
 ) {
   return jwt.sign({ userId, sessionId }, REFRESH_TOKEN_SECRET, {
     expiresIn: REFRESH_TOKEN_EXPIRES_IN,

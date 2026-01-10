@@ -1,6 +1,5 @@
 // src/validation/user.schema.ts
-import { z } from "zod";
-import { ACCOUNT_STATUSES } from "constants/authConsts.js";
+import { z } from "zod"; 
 
 /* -------------------------
    Body Schemas

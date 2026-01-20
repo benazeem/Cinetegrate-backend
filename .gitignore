@@ -52,3 +52,11 @@ coverage/
 # Local certificates
 *.pem
 *.key
+
+// IDE specific files
+.postman/
+postman/
+.history
+
+.prettierrc
+

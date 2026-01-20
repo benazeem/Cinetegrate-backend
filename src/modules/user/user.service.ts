@@ -1,8 +1,7 @@
-
 import bcrypt from "bcrypt";
 import {
   BadRequestError,
-  ConflictError, 
+  ConflictError,
   InternalServerError,
   NotFoundError,
   UnauthenticatedError,
@@ -14,11 +13,10 @@ import {
   UpdateNotificationsType,
   UpdatePrivacySettingsType,
 } from "@validation/user.schema.js";
-import mongoose, { Types } from "mongoose";
-import { generateVerificationToken, verifyToken } from "@utils/tokens.js"; 
+import mongoose from "mongoose";
+import { generateVerificationToken } from "@utils/tokens.js";
 import sendUpdateEmailLink from "@utils/emails/sender/sendUpdateEmailLink.js";
 import sendOldEmailVerificationForEmailUpdate from "@utils/emails/sender/sendOldEmailVerificationForEmailUpdate.js";
-import { generateAllCookieTokens } from "@utils/generateAllCookieTokens.js";
 
 export const getProfile = async (userId: string): Promise<User> => {
   const user = await UserModel.findById(userId)
@@ -102,9 +100,7 @@ export const deleteAvatar = async (userId: string): Promise<void> => {
   return;
 };
 
-export const getSettings = async (
-  userId: string
-): Promise<Partial<User>> => {
+export const getSettings = async (userId: string): Promise<Partial<User>> => {
   const user = await UserModel.findById(userId).select(
     "emailNotifications privacySettings"
   );
@@ -115,9 +111,7 @@ export const getSettings = async (
   return resUser;
 };
 
-export const getSecurity = async (
-  userId: string
-): Promise<Partial<User>> => {
+export const getSecurity = async (userId: string): Promise<Partial<User>> => {
   const user = await UserModel.findById(userId).select(
     "email phoneNumber passwordHash emailVerified phoneVerified lastPasswordChangeAt twoFactorEnabled oauthProviders"
   );
@@ -165,9 +159,7 @@ export const getSessions = async (
   return resSessions;
 };
 
-export const getBilling = async (
-  userId: string
-): Promise<Partial<User>> => {
+export const getBilling = async (userId: string): Promise<Partial<User>> => {
   const user = await UserModel.findById(userId).select("plan billingInfo");
   if (!user) {
     throw new NotFoundError("User not found");
@@ -397,8 +389,10 @@ export const reactivateAccount = async (
   if (!user) {
     throw new NotFoundError("User not found");
   }
-  if(user.accountStatus !== "deactive" && user.accountStatus !== "delete"){
-    throw new BadRequestError("Account is not deactivated or deleted other than that cannot be reactivated. Contact support.");
+  if (user.accountStatus !== "deactive" && user.accountStatus !== "delete") {
+    throw new BadRequestError(
+      "Account is not deactivated or deleted other than that cannot be reactivated. Contact support."
+    );
   }
   const updatedUser = await UserModel.findByIdAndUpdate(
     userId,
@@ -428,7 +422,7 @@ export const reactivateAccount = async (
     throw new NotFoundError("User not found");
   }
   const resUser = returnUserData(updatedUser, "profile");
-  
+
   return resUser;
 };
 

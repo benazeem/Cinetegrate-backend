@@ -1,9 +1,9 @@
 import { Platform, StoryIntent } from '@constants/storyConsts.js';
-import { ContextProfile } from "@models/ContextProfile.js";
-import { GLOBAL_SAFETY_RULES } from "libs/ai/constants/globalSafetyRules.js";
-import { STORY_GENERATION_FORMAT } from "../constants/storyGenerationFormat.js";
-import { buildStoryContextSection } from "./utils/buildStoryContextSection.js";
-import { calculateWordLimits } from "../constants/calculateWordLimits.js";
+import { ContextProfile } from '@models/ContextProfile.js';
+import { GLOBAL_SAFETY_RULES } from 'libs/ai/constants/globalSafetyRules.js';
+import { STORY_GENERATION_FORMAT } from '../constants/storyPromptConts.js';
+import { buildStoryContextSection } from './utils/buildStoryContextSection.js';
+import { calculateWordLimits } from '../constants/calculateWordLimits.js';
 
 type RegenerateStoryPromptInput = {
   title: string;
@@ -27,15 +27,18 @@ export function generateStoryRegenerationPrompt({
   const sections: string[] = [];
 
   /* 1. ROLE (CONTROLLED CREATION) */
-  sections.push(`
+  sections.push(
+    `
 You are a professional fiction writer and editor.
 You write with discipline, restraint, and precision.
 You must follow all constraints exactly.
 Do not explain your reasoning.
-`.trim());
+`.trim()
+  );
 
   /* 2. FIXED STORY ANCHORS (DO NOT CHANGE) */
-  sections.push(`
+  sections.push(
+    `
 STORY ANCHORS (REFERENCE ONLY — DO NOT CHANGE)
 
 Title: "${title}"
@@ -43,10 +46,12 @@ Description: "${description}"
 
 Existing Summary (intent reference only):
 ${existingSummary}
-`.trim());
+`.trim()
+  );
 
   /* 3. REGENERATION TASK */
-  sections.push(`
+  sections.push(
+    `
 REGENERATION TASK (MANDATORY)
 
 You must regenerate the story based on the anchors above.
@@ -58,21 +63,24 @@ Rules:
 - Do NOT add unnecessary exposition
 - Prefer concise, efficient storytelling
 - Brevity is a priority
-`.trim());
+`.trim()
+  );
 
   /* 4. USER REQUEST */
-  sections.push(`
+  sections.push(
+    `
 USER REQUESTED CHANGES (ONLY THESE)
 
 ${extraPrompt}
-`.trim());
- 
-  /* 5. HARD TIME / LENGTH CONSTRAINT */
- if (timeLimit) {
-  const { targetWords, minWords, maxWords } =
-    calculateWordLimits(timeLimit, contextProfile?.narrationProfile);
+`.trim()
+  );
 
-  sections.push(`
+  /* 5. HARD TIME / LENGTH CONSTRAINT */
+  if (timeLimit) {
+    const { targetWords, minWords, maxWords } = calculateWordLimits(timeLimit, contextProfile?.narrationProfile);
+
+    sections.push(
+      `
 HARD LENGTH CONSTRAINT (ABSOLUTE)
 
 - Target length: ${targetWords} words
@@ -83,17 +91,17 @@ Rules:
 - The story MUST stay within this range
 - Being shorter or longer is a FAILURE
 - If necessary, compress or expand minimally to fit
-`.trim());
-}
-
+`.trim()
+    );
+  }
 
   /* 4. CONTEXT PROFILE (BINDING, NO EXPANSION) */
-   if (contextProfile) {
-     const contextSection = buildStoryContextSection(contextProfile);
- if (contextSection) {
-   sections.push(contextSection);
- }
-   }
+  if (contextProfile) {
+    const contextSection = buildStoryContextSection(contextProfile);
+    if (contextSection) {
+      sections.push(contextSection);
+    }
+  }
 
   /* 7. GLOBAL SAFETY RULES (ABSOLUTE) */
   sections.push(GLOBAL_SAFETY_RULES.trim());
@@ -101,5 +109,5 @@ Rules:
   /* 8. OUTPUT FORMAT (STRICT JSON) */
   sections.push(STORY_GENERATION_FORMAT.trim());
 
-  return sections.join("\n\n");
+  return sections.join('\n\n');
 }

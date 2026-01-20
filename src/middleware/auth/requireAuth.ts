@@ -2,7 +2,7 @@
 import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";  
 import { UnauthenticatedError } from "@middleware/error/index.js"; 
-import { AccountStatus } from "@constants/userConts.js";
+import { AccountStatus } from "@constants/userConsts.js";
 
 export const authMiddleware = async (
   req: Request,

@@ -5,7 +5,7 @@
     "moduleResolution": "NodeNext",
 
     "rootDir": "./src",
-    "outDir": "./dist",
+    "outDir": "src/dist",
 
     "strict": true,
     "esModuleInterop": true,
@@ -26,5 +26,5 @@
       "@constants/*": ["constants/*"]
     }
   },
-  "include": ["src"]
+  "include": ["src", "dist"]
 }

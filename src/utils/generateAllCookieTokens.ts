@@ -1,6 +1,6 @@
 import { Types } from "mongoose";
 import { generateAccessToken, generateCsrfToken, generateRefreshToken } from "./tokens.js";
-import { AccountStatus } from "@constants/userConts.js";
+import { AccountStatus } from "@constants/userConsts.js";
 
 export const generateAllCookieTokens = (userId:Types.ObjectId, sessionId:string, role:string, accountStatus:AccountStatus) => {
  const accessToken = generateAccessToken(userId, sessionId, role, accountStatus);

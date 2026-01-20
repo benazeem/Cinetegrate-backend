@@ -1,6 +1,6 @@
 import { type User } from "@models/User.ts"; // whatever your user type is
 import type { Pagination, Sorting } from "@middleware/paginationAndSorting.js";
-import { type AccountStatus, Role } from "constants/userConts.ts";
+import { type AccountStatus, Role } from "@constants/userConsts.ts";
 
 type AuthenticatedUser = {
   id: string;

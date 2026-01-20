@@ -26,7 +26,7 @@ import {
   updatePassword,
   updatePrivacySettings,
   updateProfile,
-} from "./user.service.js"; 
+} from "./user.service.js";
 
 export const getProfileController = async (req: Request, res: Response) => {
   const userId = req.user!.id;
@@ -116,7 +116,7 @@ export const updatePrivacySettingsController = async (
   res: Response
 ) => {
   const userId = req.user!.id;
-  const privacyPrefs = req.validatedBody as UpdatePrivacySettingsType ;
+  const privacyPrefs = req.validatedBody as UpdatePrivacySettingsType;
   const updatedUser = await updatePrivacySettings(userId, privacyPrefs);
   return res.status(200).json({
     id: updatedUser._id,
@@ -126,7 +126,8 @@ export const updatePrivacySettingsController = async (
 
 export const updatePasswordController = async (req: Request, res: Response) => {
   const userId = req.user!.id;
-  const { currentPassword, newPassword } =  req.validatedBody  as UpdatePasswordType;
+  const { currentPassword, newPassword } =
+    req.validatedBody as UpdatePasswordType;
 
   // TODO : Ask user if wanted to remove all sessions except current
   await updatePassword(userId, currentPassword, newPassword);
@@ -137,7 +138,7 @@ export const updatePasswordController = async (req: Request, res: Response) => {
 
 export const updateEmailController = async (req: Request, res: Response) => {
   const userId = req.user!.id;
-  const { newEmail } = req.validatedBody as  UpdateEmailType;
+  const { newEmail } = req.validatedBody as UpdateEmailType;
 
   await updateEmail(userId, newEmail);
   return res.status(200).json({

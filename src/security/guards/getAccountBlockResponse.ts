@@ -1,6 +1,6 @@
-import { AccountStatus } from "@constants/userConts.js";
+import { AccountStatus } from "@constants/userConsts.js";
 import { accountStatusResponses } from "../policies/accountStatusResponses.js";
 
-export function getAccountBlockResponse(status: Partial<AccountStatus>) {
-  return accountStatusResponses(status) || null;
+export function getAccountBlockResponse(status: AccountStatus | null | undefined) {
+  return accountStatusResponses(status);
 }

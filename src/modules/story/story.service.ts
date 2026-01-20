@@ -1,5 +1,4 @@
-import { platform } from '@constants/storyConsts.js';
-import { ConflictError, NotFoundError } from "@middleware/error/index.js";
+ import { ConflictError, NotFoundError } from "@middleware/error/index.js";
 import {
   ContextProfileModel,
   ContextScope,
@@ -14,7 +13,7 @@ import {
 } from "@validation/story.schema.js";
 import { NARRATION_PROFILES } from "constants/narrationProfiles.js";
 import { openRouterAI } from "libs/ai/clients/openAI.js";
-import { generateStoryPrompt } from "libs/ai/prompts/generateStoryPrompt.js";
+import { generateStoryPrompt } from "@libs/ai/prompts/generateStoryPrompt.js";
 import { generateStoryRegenerationPrompt } from "libs/ai/prompts/generateStoryRegenerationPrompt.js";
 import mongoose from "mongoose";
 import { Pagination, Sorting } from "types/Pagination.js"; 
@@ -290,9 +289,7 @@ export async function generateStory(userId: string, storyId: string) {
       },
     },
     { new: true, runValidators: true }
-  );
-
-  console.log("AI RESPONSE RECEIVED IN SERVICE:", content);
+  ); 
 
   return updatedStory;
 }

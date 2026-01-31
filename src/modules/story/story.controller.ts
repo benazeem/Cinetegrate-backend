@@ -41,8 +41,7 @@ export const getUserStoriesController = async (req: Request, res: Response) => {
 export const getProjectStoriesController = async (
   req: Request,
   res: Response
-) => {
-  console.log("STORY ROUTER REGISTERED");
+) => { 
 
   const userId = req.user!.id;
   const projectId = req.params.projectId;
@@ -78,7 +77,7 @@ export const createStoryController = async (req: Request, res: Response) => {
 
 export const getStoryByIdController = async (req: Request, res: Response) => {
   const userId = req.user!.id;
-  const storyId = req.params.id;
+  const storyId = req.params.storyId;
   const story = await getStoryById(userId, storyId);
   return res.status(200).json({
     story,
@@ -205,13 +204,6 @@ export const restoreStoryController = async (req: Request, res: Response) => {
   });
 };
 
-export const rollbackStoryController = async (req: Request, res: Response) => {
-  const userId = req.user!.id;
-  const storyId = req.params.id;
-
-  // to be implemented
-};
-
 export const archiveStoryStatusController = async (
   req: Request,
   res: Response
@@ -235,4 +227,12 @@ export const unarchiveStoryController = async (req: Request, res: Response) => {
     message: "Story unarchived successfully",
     ...response,
   });
+};
+
+
+export const rollbackStoryController = async (req: Request, res: Response) => {
+  const userId = req.user!.id;
+  const storyId = req.params.storyId;
+
+  // to be implemented
 };

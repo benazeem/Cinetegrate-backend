@@ -5,7 +5,7 @@ import mongoose, { Types } from "mongoose";
 import { RESET_EXP_MIN } from "constants/authConsts.js";
 import { UserModel, type User } from "@models/User.js";
 import { SessionModel, type Session } from "@models/Session.js";
-import { 
+import {
   generateAccessToken,
   generateCsrfToken,
   generateRefreshToken,
@@ -28,9 +28,9 @@ import {
 import sendWelcomeEmail from "@utils/emails/sender/sendWelcomeEmail.js";
 import sendResetLink from "@utils/emails/sender/sendResetLink.js";
 import sendPasswordUpdatedEmail from "@utils/emails/sender/sendPasswordUpdatedEmail.js";
-import sendVerificationEmail from "@utils/emails/sender/sendEmailVerificationLink.js"; 
-import ensureActiveAccount from "security/guards/ensureActiveAccount.js"; 
-import { getAccountBlockResponse } from "security/guards/getAccountBlockResponse.js";  
+import sendVerificationEmail from "@utils/emails/sender/sendEmailVerificationLink.js";
+import ensureActiveAccount from "security/guards/ensureActiveAccount.js";
+import { getAccountBlockResponse } from "security/guards/getAccountBlockResponse.js";
 import { createUserSession } from "./utils/createUserSession.js";
 
 type LoginInputWithMeta = LoginInput & {
@@ -43,16 +43,16 @@ type SignOutput = {
     accessToken: string;
     refreshToken: string;
     csrfToken: string;
-  }; 
+  };
 };
 type RegisterInputWithMeta = RegisterInput & {
   userAgent: string;
   ip: string | string[] | undefined;
 };
-interface RefreshTokenOutput {  
-    accessToken: string;
-    refreshToken: string;
-    csrfToken: string; 
+interface RefreshTokenOutput {
+  accessToken: string;
+  refreshToken: string;
+  csrfToken: string;
 }
 
 export async function registerUser(
@@ -68,8 +68,8 @@ export async function registerUser(
     }
   }
   // Metadata
-  
-  const passwordHash = await bcrypt.hash(password, 10); 
+
+  const passwordHash = await bcrypt.hash(password, 10);
 
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -90,14 +90,14 @@ export async function registerUser(
     const user: User = result[0];
 
     const { sessionPayload, tokens } = await createUserSession({
-  user,
-  userAgent,
-  ip: (Array.isArray(ip) ? ip[0] : ip) || "",
-}); 
+      user,
+      userAgent,
+      ip: (Array.isArray(ip) ? ip[0] : ip) || "",
+    });
     await SessionModel.create(
       [
         {
-          ...sessionPayload
+          ...sessionPayload,
         },
       ],
       { session }
@@ -118,7 +118,7 @@ export async function registerUser(
 
 export async function loginUser(
   input: LoginInputWithMeta
-): Promise<SignOutput  > {
+): Promise<SignOutput> {
   const { email, password, userAgent, ip } = input;
 
   const user: User | null = await UserModel.findOne({ email }).select(
@@ -128,30 +128,29 @@ export async function loginUser(
     throw new UnauthenticatedError("Email or Password does not match!");
   }
   const active = ensureActiveAccount(user);
-  if(!active) {
-   const status = user.accountStatus;
-   const errorResponse = getAccountBlockResponse(status);
-   if (errorResponse) {
-    throw new ForbiddenError(errorResponse.message, {
-      reason: errorResponse.reason,
-      nextStep: errorResponse.nextStep,
-    })
-   }
+  if (!active) {
+    const status = user.accountStatus;
+    const errorResponse = getAccountBlockResponse(status);
+    if (errorResponse) {
+      throw new ForbiddenError(errorResponse.message, {
+        reason: errorResponse.reason,
+        nextStep: errorResponse.nextStep,
+      });
+    }
     throw new UnauthenticatedError("Not allowed to login.");
   }
-  
+
   const passedTest = await bcrypt.compare(password, user.passwordHash);
   if (!passedTest) {
     throw new UnauthenticatedError("Email or Password does not match!");
-  } 
-  
- 
+  }
+
   const { sessionPayload, tokens } = await createUserSession({
     user,
     userAgent,
     ip: (Array.isArray(ip) ? ip[0] : ip) || "",
-  }); 
- await SessionModel.create(sessionPayload);
+  });
+  await SessionModel.create(sessionPayload);
 
   return { user, tokens };
 }
@@ -198,10 +197,7 @@ export async function refreshTokens(
   }
 
   // verify refresh token (CORRECT ORDER)
-  const isValidToken = verifyToken(
-    refreshToken,
-    session.refreshTokenHash
-  );
+  const isValidToken = verifyToken(refreshToken, session.refreshTokenHash);
 
   if (!isValidToken) {
     await SessionModel.updateOne(
@@ -209,9 +205,7 @@ export async function refreshTokens(
       { valid: false, revokedAt: new Date() }
     ).exec();
 
-    throw new UnauthenticatedError(
-      "Authentication failed: Session revoked"
-    );
+    throw new UnauthenticatedError("Authentication failed: Session revoked");
   }
 
   const user = await UserModel.findOne({
@@ -231,10 +225,7 @@ export async function refreshTokens(
     user.accountStatus
   );
 
-  const newRefreshToken = generateRefreshToken(
-    user._id,
-    session.sessionId
-  );
+  const newRefreshToken = generateRefreshToken(user._id, session.sessionId);
 
   const newCsrfToken = generateCsrfToken();
 
@@ -318,16 +309,16 @@ export async function resetPassword(rawToken: string, newPassword: string) {
   ) {
     throw new BadRequestError("Invalid or expired token");
   }
- 
+
   if (user.passwordReset.expiresAt.getTime() < Date.now()) {
-   user.passwordReset = undefined;
+    user.passwordReset = undefined;
     await user.save();
     throw new BadRequestError("Invalid or expired token");
   }
 
   const isValid = verifyToken(rawToken, user.passwordReset.tokenHash);
   if (!isValid) {
-     throw new BadRequestError("Invalid or expired token");
+    throw new BadRequestError("Invalid or expired token");
   }
 
   const hashedPassword = await bcrypt.hash(newPassword, 10);
@@ -383,23 +374,21 @@ export async function resetPassword(rawToken: string, newPassword: string) {
   }
 }
 
-export async function sendEmailVerification(
-  userId: string
-): Promise<void> {
+export async function sendEmailVerification(userId: string): Promise<void> {
   const user: User | null = await UserModel.findById(userId).select(
     "+emailVerification +changeHistory"
   );
   if (!user) {
     throw new NotFoundError("User not found");
   }
-   const active = ensureActiveAccount(user);
-   if(!active) {
+  const active = ensureActiveAccount(user);
+  if (!active) {
     throw new ForbiddenError("Account is not active");
-  } 
+  }
   if (user.emailVerified) {
     throw new ConflictError("Email is already verified");
   }
- 
+
   const token = generateVerificationToken();
 
   const verifyEmailUrl = `${
@@ -445,7 +434,7 @@ export async function verifyEmail(verificationToken: string): Promise<void> {
     throw new BadRequestError("Invalid or expired verification token");
   }
   const active = ensureActiveAccount(user);
-  if(!active) {
+  if (!active) {
     throw new ForbiddenError("Account is not active");
   }
 
@@ -504,7 +493,7 @@ export async function verifyUpdateEmail(
     throw new BadRequestError("Invalid or expired verification token");
   }
   const active = ensureActiveAccount(user);
-  if(!active) {
+  if (!active) {
     throw new ForbiddenError("Account is not active");
   }
   if (

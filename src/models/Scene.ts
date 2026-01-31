@@ -1,4 +1,4 @@
-import { Schema, model, Document, Types } from "mongoose";
+import { Schema, model, Document, Types } from 'mongoose';
 
 // export interface SceneAssetHistoryEntry {
 //   assetId: Types.ObjectId;
@@ -21,11 +21,12 @@ export interface Scene extends Document {
   order: number;
   title?: string;
   description: string;
-  authorType: "ai" | "user"
+  authorType: 'ai' | 'user';
   imagePrompt: string;
-  videoPrompt?: string; 
+  videoPrompt: string;
   duration?: number;
-  activeAssetId?: Types.ObjectId;  
+  activeAssetId?: Types.ObjectId;
+  deletedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -34,14 +35,14 @@ const sceneSchema = new Schema<Scene>(
   {
     userId: {
       type: Schema.Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       required: true,
       index: true,
     },
 
     storyId: {
       type: Schema.Types.ObjectId,
-      ref: "Story",
+      ref: 'Story',
       required: true,
     },
 
@@ -61,28 +62,37 @@ const sceneSchema = new Schema<Scene>(
       type: String,
       required: true,
     },
-authorType: {
+    authorType: {
       type: String,
-      enum: ["ai", "user"],
-      default: "ai",
-},
+      enum: ['ai', 'user'],
+      default: 'ai',
+    },
     imagePrompt: {
       type: String,
       required: true,
-    }, 
+    },
+    videoPrompt: {
+      type: String,
+      required: true,
+    },
     duration: {
       type: Number,
     },
- 
-    activeAssetId: {
-      type: Schema.Types.ObjectId,
-      ref: "SceneAsset",
+    deletedAt: {
+      type: Date,
+      default: undefined,
+      index: true,
     },
-     
   },
   { timestamps: true }
 );
 
-sceneSchema.index({ storyId: 1, order: 1 }, { unique: true });
+sceneSchema.index(
+  { storyId: 1, order: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { deletedAt: { $exists: false } },
+  }
+);
 
-export const SceneModel = model<Scene>("Scene", sceneSchema);
+export const SceneModel = model<Scene>('Scene', sceneSchema);

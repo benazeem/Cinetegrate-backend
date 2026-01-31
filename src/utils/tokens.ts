@@ -2,7 +2,7 @@ import jwt, { type SignOptions } from "jsonwebtoken";
 import crypto from "crypto";
 import type { Types } from "mongoose";
 import { UnauthenticatedError } from "@middleware/error/index.js";
-import { AccountStatus } from "@constants/userConts.js";
+import { AccountStatus } from "@constants/userConsts.js";
 
 const ACCESS_TOKEN_EXPIRES_IN: SignOptions["expiresIn"] = process.env
   .ACCESS_TOKEN_EXPIRES_IN as SignOptions["expiresIn"];

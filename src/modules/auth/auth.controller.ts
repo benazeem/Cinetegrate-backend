@@ -17,7 +17,7 @@ import type {
   ForgetPasswordInput,
   VerifyEmailInput,
   VerifyUpdateEmailInput,
-} from "@validation/auth.schema.js"; 
+} from "@validation/auth.schema.js";
 
 const CookieOptions: CookieOptions = {
   httpOnly: true,
@@ -26,12 +26,12 @@ const CookieOptions: CookieOptions = {
   maxAge: 1 * 24 * 60 * 60 * 1000,
 };
 
-const CSRF_AGE = 15*24*60*1000;
-const REFRESH_AGE = 15*24*60*1000;
-const ACCESS_AGE = 30*60*1000;
+const CSRF_AGE = 15 * 24 * 60 * 60 * 1000;
+const REFRESH_AGE = 15 * 24 * 60 * 60 * 1000;
+const ACCESS_AGE = 30 * 60 * 1000;
 
 export const registerController = async (req: Request, res: Response) => {
-  const body =  req.validatedBody as RegisterInput;
+  const body = req.validatedBody as RegisterInput;
 
   const userAgent: string = req.headers["user-agent"] || "unknown";
   const ip =
@@ -96,7 +96,7 @@ export const loginController = async (req: Request, res: Response) => {
     })
     .cookie("refresh-token", refreshToken, {
       ...CookieOptions,
-      maxAge:  REFRESH_AGE,
+      maxAge: REFRESH_AGE,
     })
     .cookie("csrf-token", csrfToken, {
       ...CookieOptions,
@@ -126,7 +126,10 @@ export const forgotPasswordController = async (req: Request, res: Response) => {
 };
 
 export const resetPasswordController = async (req: Request, res: Response) => {
-  const { token, password } = req.validatedBody as { token: string; password: string };
+  const { token, password } = req.validatedBody as {
+    token: string;
+    password: string;
+  };
   await resetPassword(token, password);
   return res.status(200).json({
     status: "success",
@@ -170,7 +173,7 @@ export const emailVerificationController = async (
   req: Request,
   res: Response
 ) => {
-  const userId = req?.user!.id
+  const userId = req?.user!.id;
 
   await sendEmailVerification(userId);
   return res.status(200).json({
@@ -191,7 +194,8 @@ export const verifyEmailChangeController = async (
   req: Request,
   res: Response
 ) => {
-  const { verificationToken, code } = req.validatedBody as VerifyUpdateEmailInput;
+  const { verificationToken, code } =
+    req.validatedBody as VerifyUpdateEmailInput;
   const currentSessionId = req?.sessionId;
   await verifyUpdateEmail(verificationToken, code, currentSessionId);
   return res.status(200).json({

@@ -1,4 +1,4 @@
-import { AccountStatus } from "@constants/userConts.js";
+import { AccountStatus } from "@constants/userConsts.js";
 
 export type AccountBlockStatusResponse = {
   httpStatus: number;

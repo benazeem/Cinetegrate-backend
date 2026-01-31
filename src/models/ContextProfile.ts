@@ -1,108 +1,110 @@
-import { Schema, model, Document, Types } from "mongoose";
+import { Schema, model, Document, Types } from 'mongoose';
+import { features } from 'process';
+import { required } from 'zod/mini';
 
 export enum GenreType {
-  HORROR = "horror",
-  PSYCHOLOGICAL_HORROR = "psychological-horror",
-  THRILLER = "thriller",
-  CRIME = "crime",
-  NOIR = "noir",
-  SCIFI = "sci-fi",
-  HARD_SCIFI = "hard-sci-fi",
-  CYBERPUNK = "cyberpunk",
-  FANTASY = "fantasy",
-  DARK_FANTASY = "dark-fantasy",
-  DRAMA = "drama",
-  HISTORICAL = "historical",
-  WAR = "war",
-  MYSTERY = "mystery",
-  ROMANCE = "romance",
-  TRAGEDY = "tragedy",
-  ADVENTURE = "adventure",
-  POST_APOCALYPTIC = "post-apocalyptic",
+  HORROR = 'horror',
+  PSYCHOLOGICAL_HORROR = 'psychological-horror',
+  THRILLER = 'thriller',
+  CRIME = 'crime',
+  NOIR = 'noir',
+  SCIFI = 'sci-fi',
+  HARD_SCIFI = 'hard-sci-fi',
+  CYBERPUNK = 'cyberpunk',
+  FANTASY = 'fantasy',
+  DARK_FANTASY = 'dark-fantasy',
+  DRAMA = 'drama',
+  HISTORICAL = 'historical',
+  WAR = 'war',
+  MYSTERY = 'mystery',
+  ROMANCE = 'romance',
+  TRAGEDY = 'tragedy',
+  ADVENTURE = 'adventure',
+  POST_APOCALYPTIC = 'post-apocalyptic',
 }
 
 export enum ToneType {
-  DARK = "dark",
-  BLEAK = "bleak",
-  GRITTY = "gritty",
-  NEUTRAL = "neutral",
-  HOPEFUL = "hopeful",
-  INTIMATE = "intimate",
-  EPIC = "epic",
-  SURREAL = "surreal",
-  SOMBER = "somber",
+  DARK = 'dark',
+  BLEAK = 'bleak',
+  GRITTY = 'gritty',
+  NEUTRAL = 'neutral',
+  HOPEFUL = 'hopeful',
+  INTIMATE = 'intimate',
+  EPIC = 'epic',
+  SURREAL = 'surreal',
+  SOMBER = 'somber',
 }
 
 export enum MoodType {
-  EERIE = "eerie",
-  TENSE = "tense",
-  CALM = "calm",
-  MELANCHOLIC = "melancholic",
-  OMINOUS = "ominous",
-  LONELY = "lonely",
-  PARANOID = "paranoid",
-  DESPERATE = "desperate",
-  HOPELESS = "hopeless",
-  BITTERSWEET = "bittersweet",
+  EERIE = 'eerie',
+  TENSE = 'tense',
+  CALM = 'calm',
+  MELANCHOLIC = 'melancholic',
+  OMINOUS = 'ominous',
+  LONELY = 'lonely',
+  PARANOID = 'paranoid',
+  DESPERATE = 'desperate',
+  HOPELESS = 'hopeless',
+  BITTERSWEET = 'bittersweet',
 }
 
 export enum StyleType {
-  CINEMATIC = "cinematic",
-  POETIC = "poetic",
-  MINIMAL = "minimal",
-  LITERARY = "literary",
-  GRITTY_REALISM = "gritty-realism",
-  EXPERIMENTAL = "experimental",
-  VOICEOVER_HEAVY = "voiceover-heavy",
+  CINEMATIC = 'cinematic',
+  POETIC = 'poetic',
+  MINIMAL = 'minimal',
+  LITERARY = 'literary',
+  GRITTY_REALISM = 'gritty-realism',
+  EXPERIMENTAL = 'experimental',
+  VOICEOVER_HEAVY = 'voiceover-heavy',
 }
 
 export enum EnvironmentType {
-  APARTMENT = "apartment",
-  MOTEL = "motel",
-  CITY = "city",
-  MEGACITY = "megacity",
-  SUBURB = "suburb",
-  FOREST = "forest",
-  DESERT = "desert",
-  MOUNTAINS = "mountains",
-  SPACE_STATION = "space-station",
-  SPACESHIP = "spaceship",
-  UNDERGROUND = "underground",
-  BUNKER = "bunker",
-  VILLAGE = "village",
-  ABANDONED_FACILITY = "abandoned-facility",
-  OCEAN = "ocean",
+  APARTMENT = 'apartment',
+  MOTEL = 'motel',
+  CITY = 'city',
+  MEGACITY = 'megacity',
+  SUBURB = 'suburb',
+  FOREST = 'forest',
+  DESERT = 'desert',
+  MOUNTAINS = 'mountains',
+  SPACE_STATION = 'space-station',
+  SPACESHIP = 'spaceship',
+  UNDERGROUND = 'underground',
+  BUNKER = 'bunker',
+  VILLAGE = 'village',
+  ABANDONED_FACILITY = 'abandoned-facility',
+  OCEAN = 'ocean',
 }
 
 export enum CameraMotion {
-  STATIC = "static",
-  SLOW_PAN = "slow-pan",
-  DOLLY = "dolly",
-  HANDHELD = "handheld",
-  STEADICAM = "steadicam",
-  TRACKING = "tracking",
-  DRIFTING = "drifting",
+  STATIC = 'static',
+  SLOW_PAN = 'slow-pan',
+  DOLLY = 'dolly',
+  HANDHELD = 'handheld',
+  STEADICAM = 'steadicam',
+  TRACKING = 'tracking',
+  DRIFTING = 'drifting',
 }
 
 export enum IntensityCurve {
-  FLAT = "flat",
-  RISING = "rising",
-  SLOW_BURN = "slow-burn",
-  PULSED = "pulsed",
-  SPIKING = "spiking",
-  COLLAPSING = "collapsing",
+  FLAT = 'flat',
+  RISING = 'rising',
+  SLOW_BURN = 'slow-burn',
+  PULSED = 'pulsed',
+  SPIKING = 'spiking',
+  COLLAPSING = 'collapsing',
 }
 
 export enum NarrativeScope {
-  INTIMATE = "intimate",
-  LOCAL = "local",
-  REGIONAL = "regional",
-  EPIC = "epic",
+  INTIMATE = 'intimate',
+  LOCAL = 'local',
+  REGIONAL = 'regional',
+  EPIC = 'epic',
 }
 
 export enum ContextScope {
-  PROJECT = "project",
-  GLOBAL = "global",
+  PROJECT = 'project',
+  GLOBAL = 'global',
 }
 
 export interface EnvironmentProfile {
@@ -116,18 +118,18 @@ export interface NarrationProfile {
   minWordTolerance: number;
   maxWordTolerance: number;
 
-  pauseBias: "none" | "low" | "medium" | "high";
-  sentenceLengthBias: "very-short" | "short" | "medium" | "long";
-  clauseDensity: "sparse" | "balanced" | "dense";
+  pauseBias: 'none' | 'low' | 'medium' | 'high';
+  sentenceLengthBias: 'very-short' | 'short' | 'medium' | 'long';
+  clauseDensity: 'sparse' | 'balanced' | 'dense';
 
   tone: ToneType;
-  emotionBias: "flat" | "subtle" | "expressive";
+  emotionBias: 'flat' | 'subtle' | 'expressive';
   intensityCurve: IntensityCurve;
 }
 
 export interface ForbiddenElement {
   label: string;
-  severity: "hard" | "soft";
+  severity: 'hard' | 'soft';
 }
 
 export interface ContextProfile extends Document {
@@ -136,10 +138,11 @@ export interface ContextProfile extends Document {
   projectId?: Types.ObjectId;
   scope: ContextScope;
   isDefaultForProject: boolean;
+  parentContextId: Types.ObjectId;
 
   name: string;
   description?: string;
-  active: boolean;
+  language?: string;
 
   genre: GenreType;
   mood: MoodType;
@@ -154,6 +157,9 @@ export interface ContextProfile extends Document {
   characters?: {
     name: string;
     description?: string;
+    imageUrl?: string;
+    features?: Record<string, any>;
+    behaviors?: Record<string, any>;
   }[];
 
   forbiddenElements?: ForbiddenElement[];
@@ -169,15 +175,13 @@ const contextProfileSchema = new Schema<ContextProfile>(
   {
     userId: {
       type: Schema.Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       required: true,
-      index: true,
     },
 
     projectId: {
       type: Schema.Types.ObjectId,
-      ref: "Project",
-      index: true,
+      ref: 'Project',
     },
 
     scope: {
@@ -191,7 +195,11 @@ const contextProfileSchema = new Schema<ContextProfile>(
       type: Boolean,
       default: false,
     },
-  
+    parentContextId: {
+      type: Schema.Types.ObjectId,
+      ref: 'ContextProfile',
+      required: true,
+    },
     name: {
       type: String,
       required: true,
@@ -202,12 +210,10 @@ const contextProfileSchema = new Schema<ContextProfile>(
       type: String,
       maxlength: 600,
     },
-
-    active: {
-      type: Boolean,
-      default: true,
+    language: {
+      type: String,
+      default: 'en',
     },
-
     genre: {
       type: String,
       enum: Object.values(GenreType),
@@ -260,7 +266,10 @@ const contextProfileSchema = new Schema<ContextProfile>(
     characters: [
       {
         name: { type: String, required: true },
-        description: String,
+        imageUrl: { type: String },
+        description: { type: String, maxlength: 500, required: true },
+        features: { type: Schema.Types.Mixed },
+        behaviors: { type: Schema.Types.Mixed },
       },
     ],
 
@@ -269,8 +278,8 @@ const contextProfileSchema = new Schema<ContextProfile>(
         label: String,
         severity: {
           type: String,
-          enum: ["hard", "soft"],
-          default: "hard",
+          enum: ['hard', 'soft'],
+          default: 'hard',
         },
       },
     ],
@@ -282,19 +291,19 @@ const contextProfileSchema = new Schema<ContextProfile>(
 
       pauseBias: {
         type: String,
-        enum: ["none", "low", "medium", "high"],
+        enum: ['none', 'low', 'medium', 'high'],
         required: true,
       },
 
       sentenceLengthBias: {
         type: String,
-        enum: ["very-short", "short", "medium", "long"],
+        enum: ['very-short', 'short', 'medium', 'long'],
         required: true,
       },
 
       clauseDensity: {
         type: String,
-        enum: ["sparse", "balanced", "dense"],
+        enum: ['sparse', 'balanced', 'dense'],
         required: true,
       },
 
@@ -306,7 +315,7 @@ const contextProfileSchema = new Schema<ContextProfile>(
 
       emotionBias: {
         type: String,
-        enum: ["flat", "subtle", "expressive"],
+        enum: ['flat', 'subtle', 'expressive'],
         required: true,
       },
 
@@ -324,10 +333,7 @@ const contextProfileSchema = new Schema<ContextProfile>(
 );
 
 contextProfileSchema.index({ projectId: 1, isDefaultForProject: 1 });
-contextProfileSchema.index({ parentContextId: 1 }); 
-contextProfileSchema.index({ userId: 1, lastUsedAt: -1 }); 
+contextProfileSchema.index({ parentContextId: 1 });
+contextProfileSchema.index({ userId: 1, lastUsedAt: -1 });
 
-export const ContextProfileModel = model<ContextProfile>(
-  "ContextProfile",
-  contextProfileSchema
-);
+export const ContextProfileModel = model<ContextProfile>('ContextProfile', contextProfileSchema);

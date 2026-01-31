@@ -1,11 +1,12 @@
-import { generateAllCookieTokens } from "@utils/generateAllCookieTokens.js";
-import { getIpInfo } from "@utils/getIpInfo.js";
-import { parseUserAgent } from "@utils/parseUserAgent.js";
-import { hashToken } from "@utils/tokens.js";
-import crypto from "crypto";
-import { User } from "@models/User.js";
+import { Session } from '../../../models/Session.js';
+import { generateAllCookieTokens } from '@utils/generateAllCookieTokens.js';
+import { getIpInfo } from '@utils/getIpInfo.js';
+import { parseUserAgent } from '@utils/parseUserAgent.js';
+import { hashToken } from '@utils/tokens.js';
+import crypto from 'crypto';
+import { User } from '@models/User.js';
 
-export async function createUserSession({
+export async function createSessionPayload({
   user,
   userAgent,
   ip,
@@ -17,7 +18,7 @@ export async function createUserSession({
   const ipData: any = await getIpInfo(ip);
   const userAgentInfo = parseUserAgent(userAgent);
 
-  const sessionId = crypto.randomBytes(32).toString("hex");
+  const sessionId = crypto.randomBytes(32).toString('hex');
 
   const { accessToken, refreshToken, csrfToken } = generateAllCookieTokens(
     user._id,
@@ -43,8 +44,8 @@ export async function createUserSession({
     refreshTokenHash: hashToken(refreshToken),
     csrfTokenHash: hashToken(csrfToken),
     expiresIn: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-    createdAt: Date.now(),
-    lastUsedAt: Date.now(),
+    createdAt: new Date(),
+    lastUsedAt: new Date(),
   };
 
   return {

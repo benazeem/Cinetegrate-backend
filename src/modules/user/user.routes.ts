@@ -30,7 +30,7 @@ import {
 } from "@validation/user.schema.js";
 import { validateBody } from "@validation/validateBody.js";
 import { validateParams } from "@validation/validateParams.js";
-import { avatarUpload } from "@middleware/avatarUpload.js";  
+import { avatarUpload } from "@middleware/multer/avatarUpload.js";  
 import { requireActiveAccount } from "@middleware/security/requireActiveAccount.js";
 
 const router = Router();

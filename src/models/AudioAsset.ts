@@ -1,19 +1,17 @@
-import { Schema, model, Document, Types } from "mongoose";
+import { Schema, model, Document, Types } from 'mongoose';
 
 export interface AudioAsset extends Document {
   userId: Types.ObjectId;
-  type: "narration" | "background" | "effect";
+  narrationId?: Types.ObjectId;
+  activeNarration: boolean;
+  type: 'narration' | 'background' | 'effect';
   url: string;
-  prompt?: string; // for AI-generated audio
-  generationSource: "ai" | "upload"; 
+  prompt?: string;
+  generationSource: 'ai' | 'user';
   voiceId?: string;
-  language?: string;
-  accent?: string;
-  tone?: string;
-  pacing?: string;
-  duration?: number; // seconds
-  format?: string; // mp3, wav, etc.
-  saved: boolean; // saved to library or not
+  duration?: number;
+  version?: number;
+  deletedAt: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -22,13 +20,20 @@ const audioAssetSchema = new Schema<AudioAsset>(
   {
     userId: {
       type: Schema.Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       required: true,
-      index: true,
+    },
+    narrationId: {
+      type: Schema.Types.ObjectId,
+      ref: 'StoryNarration',
+    },
+    activeNarration: {
+      type: Boolean,
+      default: false,
     },
     type: {
       type: String,
-      enum: ["narration", "background", "effect"],
+      enum: ['narration', 'background', 'effect'],
       required: true,
     },
     url: {
@@ -40,40 +45,36 @@ const audioAssetSchema = new Schema<AudioAsset>(
     },
     generationSource: {
       type: String,
-      enum: ["ai", "upload"],
-      default: "ai",
+      enum: ['ai', 'user'],
+      default: 'ai',
     },
     voiceId: {
-      type: String,
-    },
-    language: {
-      type: String,
-    },
-    accent: {
-      type: String,
-    },
-    tone: {
-      type: String,
-    },
-    pacing: {
       type: String,
     },
     duration: {
       type: Number,
     },
-    format: {
-      type: String,
+    version: {
+      type: Number,
+      required: true,
+      default: 1,
+      min: 1,
     },
-    saved: {
-      type: Boolean,
-      default: false,
-      index: true,
+    deletedAt: {
+      type: Date,
     },
   },
   { timestamps: true }
 );
 
-export const AudioAssetModel = model<AudioAsset>(
-  "AudioAsset",
-  audioAssetSchema
+audioAssetSchema.index(
+  { narrationId: 1, activeNarration: 1 },
+  { unique: true, partialFilterExpression: { activeNarration: true, deletedAt: { $exists: false } } }
 );
+
+audioAssetSchema.index(
+  { narrationId: 1, version: 1 },
+  { unique: true, partialFilterExpression: { deletedAt: { $exists: false } } }
+);
+
+export const AudioAssetModel = model<AudioAsset>('AudioAsset', audioAssetSchema);

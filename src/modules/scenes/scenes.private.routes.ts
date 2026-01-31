@@ -19,22 +19,30 @@ import {
 
 import {
   getAllStoryScenesController,
+  getAllInactiveStoryScenesController,
+  getAllDeletedScenesController,
   getSceneByIdController,
   createSceneController,
   updateSceneController,
-  deleteSceneController,
+  softDeleteSceneController,
+  permanentDeleteAllScenesController,
   restoreSceneController,
   moveSceneController,
   bulkReorderController,
   bulkRestoreScenesController,
+  bulkSoftDeleteScenesController,
+  bulkPermanentDeleteScenesController,
   restoreAllDeletedScenesController,
+  softDeleteAllScenesController,
+  permanentDeleteSceneController,
   generateScenesController,
   regenerateScenesController,
   generateSingleSceneController,
   regenerateSceneController,
   getSceneCountController,
-  getAllDeltedScenesController,
   updateSceneDurationController,
+  deactivateSceneController,
+  reactivateSceneController,
 } from './scenes.controller.js';
 
 const router = Router();
@@ -42,23 +50,36 @@ const router = Router();
 // ALL SCENES ROUTES FOR A STORY
 
 router.get('/:storyId', validateParams(storyIdParamSchema), asyncHandler(getAllStoryScenesController));
+router.get(
+  '/:storyId/inactive',
+  validateParams(storyIdParamSchema),
+  asyncHandler(getAllInactiveStoryScenesController)
+);
 
-router.get('/:storyId/deleted', validateParams(storyIdParamSchema), asyncHandler(getAllDeltedScenesController));
+router.get(
+  '/:storyId/deleted',
+  validateParams(storyIdParamSchema),
+  asyncHandler(getAllDeletedScenesController)
+);
 
 router.get('/:storyId/count', validateParams(storyIdParamSchema), asyncHandler(getSceneCountController));
 
 router.post(
-  '/:storyId/generate',
+  '/:storyId/scenes/restore-all',
   validateParams(storyIdParamSchema),
-  validateBody(generateAllScenesSchema),
-  asyncHandler(generateScenesController)
+  asyncHandler(restoreAllDeletedScenesController)
 );
 
-router.post(
-  '/:storyId/regenerate',
+router.delete(
+  '/:storyId/scenes/soft',
   validateParams(storyIdParamSchema),
-  validateBody(regenerateSceneSchema),
-  asyncHandler(regenerateScenesController)
+  asyncHandler(softDeleteAllScenesController)
+);
+
+router.delete(
+  '/:storyId/scenes/permanent',
+  validateParams(storyIdParamSchema),
+  asyncHandler(permanentDeleteAllScenesController)
 );
 
 // BULK SCENES ROUTES
@@ -78,14 +99,40 @@ router.post(
 );
 
 router.post(
-  '/:storyId/scenes/restore-all',
+  '/:storyId/scenes/soft-delete-bulk',
   validateParams(storyIdParamSchema),
-  asyncHandler(restoreAllDeletedScenesController)
+  validateBody(bulkRestoreSchema),
+  asyncHandler(bulkSoftDeleteScenesController)
+);
+
+router.post(
+  '/:storyId/scenes/permanent-delete-bulk',
+  validateParams(storyIdParamSchema),
+  validateBody(bulkRestoreSchema),
+  asyncHandler(bulkPermanentDeleteScenesController)
 );
 
 // SINGLE SCENE ROUTES
 
-router.get('/:storyId/scene/:sceneId', validateParams(sceneAndStoryParamSchema), asyncHandler(getSceneByIdController));
+router.post(
+  '/:storyId/generate',
+  validateParams(storyIdParamSchema),
+  validateBody(generateAllScenesSchema),
+  asyncHandler(generateScenesController)
+);
+
+router.post(
+  '/:storyId/regenerate',
+  validateParams(storyIdParamSchema),
+  validateBody(regenerateSceneSchema),
+  asyncHandler(regenerateScenesController)
+);
+
+router.get(
+  '/:storyId/scene/:sceneId',
+  validateParams(sceneAndStoryParamSchema),
+  asyncHandler(getSceneByIdController)
+);
 
 router.post(
   '/:storyId/scene',
@@ -115,10 +162,28 @@ router.patch(
   asyncHandler(updateSceneDurationController)
 );
 
-router.delete(
-  '/:storyId/scene/:sceneId',
+router.post(
+  '/:storyId/scene/:sceneId/deactivate',
   validateParams(sceneAndStoryParamSchema),
-  asyncHandler(deleteSceneController)
+  asyncHandler(deactivateSceneController)
+);
+
+router.post(
+  '/:storyId/scene/:sceneId/reactivate',
+  validateParams(sceneAndStoryParamSchema),
+  asyncHandler(reactivateSceneController)
+);
+
+router.delete(
+  '/:storyId/scene/:sceneId/soft',
+  validateParams(sceneAndStoryParamSchema),
+  asyncHandler(softDeleteSceneController)
+);
+
+router.delete(
+  '/:storyId/scene/:sceneId/permanent',
+  validateParams(sceneAndStoryParamSchema),
+  asyncHandler(permanentDeleteSceneController)
 );
 
 router.post(

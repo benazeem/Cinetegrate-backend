@@ -1,15 +1,10 @@
-import type { User } from "@models/User.js";
+import type { User } from '@models/User.js';
 
-type UserReturnType =
-  | "profile"
-  | "settings"
-  | "security"
-  | "billing"
-  | "account";
+type UserReturnType = 'profile' | 'settings' | 'security' | 'billing' | 'account';
 
-export const returnUserData = (user: User, type: UserReturnType) => {
+export const sanitizeUserResponse = (user: User, type: UserReturnType) => {
   switch (type) {
-    case "profile":
+    case 'profile':
       return {
         _id: user._id,
         email: user.email,
@@ -18,13 +13,13 @@ export const returnUserData = (user: User, type: UserReturnType) => {
         avatarUrl: user.avatarUrl ?? null,
         bio: user.bio ?? null,
         links: user.links ?? {},
-        plan: user.plan,
+        plan: user.currentPlan,
         emailVerified: user.emailVerified,
         usage: user.usage,
         accountStatus: user.accountStatus,
       };
 
-    case "settings":
+    case 'settings':
       return {
         _id: user._id,
         email: user.email,
@@ -32,14 +27,14 @@ export const returnUserData = (user: User, type: UserReturnType) => {
         displayName: user.displayName,
         avatarUrl: user.avatarUrl ?? null,
         bio: user.bio ?? null,
-        plan: user.plan,
+        plan: user.currentPlan,
         privacyPrefs: user.privacyPrefs ?? {},
         notificationPrefs: user.notificationPrefs ?? {},
         usage: user.usage,
         links: user.links ?? {},
       };
 
-    case "security":
+    case 'security':
       return {
         email: user.email,
         phoneNumber: user.phoneNumber ?? null,
@@ -51,10 +46,10 @@ export const returnUserData = (user: User, type: UserReturnType) => {
         providers: user.oauthProviders ?? [],
       };
 
-    case "billing":
+    case 'billing':
       return {
-        plan: user.plan,
-        billingStatus: user.billingStatus ?? "none",
+        plan: user.currentPlan,
+        billingStatus: user.billingStatus ?? 'none',
         billingProvider: user.billingProvider ?? null,
         billingCustomerId: user.billingCustomerId ?? null,
         subscriptionId: user.subscriptionId ?? null,
@@ -64,7 +59,7 @@ export const returnUserData = (user: User, type: UserReturnType) => {
         usage: user.usage,
       };
 
-    case "account":
+    case 'account':
       return {
         _id: user._id,
         email: user.email,

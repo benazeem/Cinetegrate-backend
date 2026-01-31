@@ -20,59 +20,22 @@ import type {
 import { singleScenePrompt } from '@libs/ai/prompts/singleScenePrompt.js';
 import { openRouterAI } from '@libs/ai/clients/openAI.js';
 import { ContextProfileModel } from '@models/ContextProfile.js';
-import { getContextProfileService } from '@modules/contextProfile/contextProfile.service.js';
 import { batchScenesPrompt } from '@libs/ai/prompts/batchScenesPrompt.js';
-
-// Helpers for -> Ownership and -> State validation
-async function validateStoryOwnership(
-  userId: string,
-  storyId: string,
-  session?: ClientSession
-): Promise<typeof StoryModel.prototype> {
-  const query = StoryModel.findOne({
-    _id: storyId,
-    userId,
-    status: { $ne: 'delete' },
-  });
-
-  if (session) query.session(session);
-
-  const story = await query;
-  if (!story) {
-    throw new NotFoundError('Story not found or access denied');
-  }
-  return story;
-}
-
-async function validateSceneOwnership(
-  userId: string,
-  sceneId: string,
-  options?: { session?: ClientSession }
-): Promise<Scene> {
-  const query = SceneModel.findOne({
-    _id: sceneId,
-    userId,
-  });
-  if (options?.session) query.session(options.session);
-
-  const scene = await query;
-  if (!scene) {
-    throw new NotFoundError('Scene not found or access denied');
-  }
-  return scene;
-}
-
-function assertSceneNotDeleted(scene: Scene): void {
-  if (scene.deletedAt) {
-    throw new ConflictError('Cannot perform operation on deleted scene');
-  }
-}
-
-function assertSceneIsDeleted(scene: Scene): void {
-  if (!scene.deletedAt) {
-    throw new ConflictError('Scene is not deleted');
-  }
-}
+import { validateStoryOwnership } from 'validators/validateStoryOwnership.js';
+import { withTransaction } from '@db/withTransaction.js';
+import {
+  assertHasDeletedScenes,
+  assertHasNonDeletedScenes,
+  assertSceneIsActive,
+  assertSceneIsDeleted,
+  assertSceneNotDeleted,
+} from 'domain/assertions/assertSceneState.js';
+import {
+  validateSceneOwnership,
+  validateStorySceneOwnership,
+} from 'validators/validateSceneOwnership.js';
+import e from 'express';
+import { validateUser } from 'validators/validateUser.js';
 
 // -> Ordering Helpers
 async function getNextOrderValue(storyId: string, session?: ClientSession): Promise<number> {
@@ -148,9 +111,21 @@ export async function getAllScenesForStory(userId: string, storyId: string): Pro
   const scenes = await SceneModel.find({
     storyId,
     userId,
+    active: true,
     deletedAt: { $exists: false },
   }).sort({ order: 1 });
 
+  return scenes;
+}
+
+export async function getAllInactiveScenesForStory(userId: string, storyId: string): Promise<Scene[]> {
+  await validateStoryOwnership(userId, storyId);
+  const scenes = await SceneModel.find({
+    storyId,
+    userId,
+    active: false,
+    deletedAt: { $exists: false },
+  }).sort({ order: 1 });
   return scenes;
 }
 
@@ -165,10 +140,7 @@ export async function getAllDeletedScenes(userId: string, storyId: string): Prom
 }
 
 export async function generateAllScenes(userId: string, storyId: string, total: number): Promise<Scene[]> {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
-  try {
+  return withTransaction(async (session) => {
     const story = await validateStoryOwnership(userId, storyId, session);
 
     const contextProfile = await ContextProfileModel.findOne({
@@ -205,8 +177,6 @@ export async function generateAllScenes(userId: string, storyId: string, total: 
       throw new InternalServerError('AI generation failed');
     }
 
-    console.log(generatedScenesData);
-
     if (!generatedScenesData || !Array.isArray(generatedScenesData) || generatedScenesData.length !== total) {
       throw new InternalServerError('AI returned invalid scene structure');
     }
@@ -221,7 +191,7 @@ export async function generateAllScenes(userId: string, storyId: string, total: 
         filter: { _id: doc._id },
         update: {
           $set: {
-            deletedAt: new Date(),
+            active: false,
             order: -(Date.now() * 1000 + i),
           },
         },
@@ -247,15 +217,8 @@ export async function generateAllScenes(userId: string, storyId: string, total: 
       ordered: true,
     })) as Scene[];
 
-    await session.commitTransaction();
     return scenes;
-  } catch (error) {
-    console.error('REAL ERROR:', error);
-    await session.abortTransaction();
-    throw error;
-  } finally {
-    session.endSession();
-  }
+  });
 }
 
 export async function regenerateAllScenes(
@@ -263,10 +226,7 @@ export async function regenerateAllScenes(
   storyId: string,
   extraPrompt?: string
 ): Promise<Scene[]> {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
-  try {
+  return withTransaction(async (session) => {
     const story = await validateStoryOwnership(userId, storyId, session);
 
     const existingScenes = await SceneModel.find({
@@ -319,8 +279,6 @@ export async function regenerateAllScenes(
       throw new InternalServerError('AI regeneration failed');
     }
 
-    console.log(regeneratedScenesData);
-
     if (
       !regeneratedScenesData ||
       !Array.isArray(regeneratedScenesData) ||
@@ -329,13 +287,12 @@ export async function regenerateAllScenes(
       throw new InternalServerError('AI returned invalid scene structure');
     }
 
-    // Soft-delete old scenes ONLY after AI is validated
     const ops = existingScenes.map((doc, i) => ({
       updateOne: {
         filter: { _id: doc._id },
         update: {
           $set: {
-            deletedAt: new Date(),
+            active: false,
             order: -(Date.now() * 1000 + i),
           },
         },
@@ -361,21 +318,12 @@ export async function regenerateAllScenes(
       ordered: true,
     })) as Scene[];
 
-    await session.commitTransaction();
     return scenes;
-  } catch (error) {
-    console.log(error);
-    await session.abortTransaction();
-    throw error;
-  } finally {
-    session.endSession();
-  }
+  });
 }
 
 export async function restoreAllDeletedScenes(userId: string, storyId: string): Promise<Scene[]> {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-  try {
+  return withTransaction(async (session) => {
     await validateStoryOwnership(userId, storyId, session);
     const activeScenes = await SceneModel.find({ storyId, userId, deletedAt: { $exists: false } })
       .sort({ order: -1 })
@@ -387,13 +335,16 @@ export async function restoreAllDeletedScenes(userId: string, storyId: string): 
       userId,
       deletedAt: { $exists: true },
     }).session(session);
-    if (scenesToRestore.length === 0) {
-      throw new BadRequestError('No deleted scenes to restore');
-    }
+
+    assertHasDeletedScenes(scenesToRestore);
+
     const bulkOps = scenesToRestore.map((scene, index) => ({
       updateOne: {
         filter: { _id: scene._id },
-        update: { $unset: { deletedAt: '' }, $set: { order: lastOrder + (index + 1) * SCENE_ORDER_GAP } },
+        update: {
+          $unset: { deletedAt: '' },
+          $set: { order: lastOrder + (index + 1) * SCENE_ORDER_GAP, active: true },
+        },
       },
     }));
     await SceneModel.bulkWrite(bulkOps, { session });
@@ -404,14 +355,37 @@ export async function restoreAllDeletedScenes(userId: string, storyId: string): 
       .sort({ order: 1 })
       .lean()
       .session(session);
-    await session.commitTransaction();
     return restoredScenes;
-  } catch (error) {
-    await session.abortTransaction();
-    throw error;
-  } finally {
-    session.endSession();
-  }
+  });
+}
+
+export async function softdeleteAllScenes(userId: string, storyId: string) {
+  return withTransaction(async (session) => {
+    await validateStoryOwnership(userId, storyId, session);
+    const scenesToDelete = await SceneModel.find({ storyId, userId, deletedAt: { $exists: false } }).session(
+      session
+    );
+    assertHasNonDeletedScenes(scenesToDelete);
+    await SceneModel.updateMany(
+      { storyId, userId },
+      { $set: { active: false, deletedAt: new Date(), order: -(Date.now() * 1000) } }
+    ).session(session);
+    return;
+  });
+}
+
+export async function permanentDeleteAllScenes(userId: string, storyId: string): Promise<void> {
+  return withTransaction(async (session) => {
+    await validateStoryOwnership(userId, storyId, session);
+    const scenesToDelete = await SceneModel.find({
+      storyId,
+      userId,
+      deletedAt: { $exists: true },
+    }).session(session);
+    assertHasDeletedScenes(scenesToDelete);
+    await SceneModel.deleteMany({ storyId, userId }).session(session);
+    return;
+  });
 }
 
 // Bulk scene services
@@ -420,10 +394,7 @@ export async function bulkRestoreScenes(
   storyId: string,
   sceneIds: string[]
 ): Promise<Scene[]> {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
-  try {
+  return withTransaction(async (session) => {
     await validateStoryOwnership(userId, storyId, session);
     const activeScenes = await SceneModel.find({ storyId, userId, deletedAt: { $exists: false } })
       .sort({ order: -1 })
@@ -437,13 +408,14 @@ export async function bulkRestoreScenes(
       deletedAt: { $exists: true },
     }).session(session);
 
-    if (scenesToRestore.length === 0) {
-      throw new BadRequestError('No valid scenes to restore');
-    }
+    assertHasDeletedScenes(scenesToRestore);
     const bulkOps = scenesToRestore.map((scene, index) => ({
       updateOne: {
         filter: { _id: scene._id },
-        update: { $unset: { deletedAt: '' }, $set: { order: lastOrder + (index + 1) * SCENE_ORDER_GAP } },
+        update: {
+          $unset: { deletedAt: '' },
+          $set: { order: lastOrder + (index + 1) * SCENE_ORDER_GAP, active: true },
+        },
       },
     }));
     await SceneModel.bulkWrite(bulkOps, { session });
@@ -456,14 +428,45 @@ export async function bulkRestoreScenes(
       .sort({ order: 1 })
       .lean()
       .session(session);
-    await session.commitTransaction();
     return restoredScenes;
-  } catch (error) {
-    await session.abortTransaction();
-    throw error;
-  } finally {
-    session.endSession();
-  }
+  });
+}
+
+export async function bulkSoftdeleteScenes(userId: string, storyId: string, sceneIds: string[]) {
+  return withTransaction(async (session) => {
+    await validateStoryOwnership(userId, storyId, session);
+    const scenesToDelete = await SceneModel.find({
+      _id: { $in: sceneIds },
+      storyId,
+      userId,
+      deletedAt: { $exists: false },
+    }).session(session);
+    assertHasNonDeletedScenes(scenesToDelete);
+    await SceneModel.updateMany(
+      { _id: { $in: sceneIds }, storyId, userId },
+      { $set: { active: false, deletedAt: new Date(), order: -(Date.now() * 1000) } }
+    ).session(session);
+    return;
+  });
+}
+
+export async function bulkPermanentDeleteScenes(
+  userId: string,
+  storyId: string,
+  sceneIds: string[]
+): Promise<void> {
+  return withTransaction(async (session) => {
+    await validateStoryOwnership(userId, storyId, session);
+    const scenesToDelete = await SceneModel.find({
+      _id: { $in: sceneIds },
+      storyId,
+      userId,
+      deletedAt: { $exists: true },
+    }).session(session);
+    assertHasDeletedScenes(scenesToDelete);
+    await SceneModel.deleteMany({ _id: { $in: sceneIds }, storyId, userId }).session(session);
+    return;
+  });
 }
 
 export async function bulkReorder(
@@ -471,13 +474,16 @@ export async function bulkReorder(
   storyId: string,
   newOrderArray: BulkReorderInput
 ): Promise<Scene[]> {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
-  try {
+  return withTransaction(async (session) => {
     await validateStoryOwnership(userId, storyId, session);
 
     const sceneIds = newOrderArray.sceneIds;
+
+    const uniqueIds = new Set(sceneIds);
+    if (uniqueIds.size !== sceneIds.length) {
+      const duplicates = sceneIds.filter((id, i) => sceneIds.indexOf(id) !== i);
+      throw new BadRequestError(`Duplicate scene IDs: ${[...new Set(duplicates)].join(', ')}`);
+    }
 
     const existingScenes = await SceneModel.find({
       _id: { $in: sceneIds },
@@ -488,11 +494,6 @@ export async function bulkReorder(
 
     if (existingScenes.length !== sceneIds.length) {
       throw new BadRequestError('Invalid scene IDs or scenes not in this story');
-    }
-
-    const uniqueIds = new Set(sceneIds);
-    if (uniqueIds.size !== sceneIds.length) {
-      throw new BadRequestError('Duplicate scene IDs in order array');
     }
 
     const tempOps = sceneIds.map((sceneId, index) => ({
@@ -522,29 +523,15 @@ export async function bulkReorder(
       .lean()
       .session(session);
 
-    await session.commitTransaction();
     return updatedScenes;
-  } catch (error) {
-    await session.abortTransaction();
-    throw error;
-  } finally {
-    session.endSession();
-  }
+  });
 }
 
 // Single scene services
 export async function getSceneById(userId: string, storyId: string, sceneId: string): Promise<Scene> {
   await validateStoryOwnership(userId, storyId);
 
-  const scene = await SceneModel.findOne({
-    _id: sceneId,
-    storyId,
-    userId,
-  });
-
-  if (!scene) {
-    throw new NotFoundError('Scene not found');
-  }
+  const scene = await validateStorySceneOwnership(userId, sceneId, storyId);
 
   return scene;
 }
@@ -555,10 +542,7 @@ export async function createScene(
   payload: CreateSceneInput,
   position?: number
 ): Promise<Scene> {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
-  try {
+  return withTransaction(async (session) => {
     await validateStoryOwnership(userId, storyId, session);
 
     let orderValue: number;
@@ -594,14 +578,8 @@ export async function createScene(
       { session }
     );
 
-    await session.commitTransaction();
     return scene;
-  } catch (error) {
-    await session.abortTransaction();
-    throw error;
-  } finally {
-    session.endSession();
-  }
+  });
 }
 
 export async function generateSceneWithAI(
@@ -610,11 +588,10 @@ export async function generateSceneWithAI(
   input?: GenerateSceneInput
 ): Promise<Scene> {
   const position = input?.position;
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
-  try {
+  return withTransaction(async (session) => {
     const story = await validateStoryOwnership(userId, storyId, session);
+
+    //TODO: Check plan and limits here
 
     let orderValue: number;
     if (position === undefined || position === null) {
@@ -629,8 +606,6 @@ export async function generateSceneWithAI(
         orderValue = calculatedOrder;
       }
     }
-
-    // check if this affects total scenes duration limit with time limit
 
     const scenes = await SceneModel.find({ storyId, userId, deletedAt: { $exists: false } })
       .lean()
@@ -697,14 +672,8 @@ export async function generateSceneWithAI(
       { session }
     );
 
-    await session.commitTransaction();
     return scene;
-  } catch (error) {
-    await session.abortTransaction();
-    throw error;
-  } finally {
-    session.endSession();
-  }
+  });
 }
 
 export async function regenerateScene(
@@ -712,11 +681,8 @@ export async function regenerateScene(
   sceneId: string,
   input?: RegenerateSceneInput
 ): Promise<Scene> {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
-  try {
-    const scene = await validateSceneOwnership(userId, sceneId, { session });
+  return withTransaction(async (session) => {
+    const scene = await validateSceneOwnership(userId, sceneId, session);
     assertSceneNotDeleted(scene);
 
     const story = await StoryModel.findById(scene.storyId).session(session);
@@ -728,9 +694,11 @@ export async function regenerateScene(
       session
     );
 
-    const scenes = await SceneModel.find({ storyId: scene.storyId, userId, deletedAt: { $exists: false } })
-      .lean()
-      .session(session);
+    const scenes = await SceneModel.find({
+      storyId: scene.storyId,
+      userId,
+      deletedAt: { $exists: false },
+    }).session(session);
 
     const previousScenesSummary = scenes
       .filter((s) => s.order < scene.order)
@@ -799,14 +767,8 @@ export async function regenerateScene(
       throw new NotFoundError('Failed to regenerate scene');
     }
 
-    await session.commitTransaction();
     return updatedScene;
-  } catch (error) {
-    await session.abortTransaction();
-    throw error;
-  } finally {
-    session.endSession();
-  }
+  });
 }
 
 export async function updateScene(
@@ -840,19 +802,42 @@ export async function updateScene(
   return updatedScene;
 }
 
-export async function updateSceneDuration(userId: string, sceneId: string, duration: number): Promise<Scene> {
-  const scene = await validateSceneOwnership(userId, sceneId);
-  assertSceneNotDeleted(scene);
-  // check if this update does not effect total scenes duration limit with  story time limit
-  const updatedScene = await SceneModel.findByIdAndUpdate(
-    sceneId,
-    { $set: { duration } },
-    { new: true, runValidators: true }
-  );
-  if (!updatedScene) {
-    throw new NotFoundError('Scene not found');
-  }
-  return updatedScene;
+export async function updateSceneDuration(
+  userId: string,
+  storyId: string,
+  sceneId: string,
+  duration: number
+): Promise<Scene> {
+  return withTransaction(async (session) => {
+    const scene = await validateStorySceneOwnership(userId, sceneId, storyId, session);
+    assertSceneNotDeleted(scene);
+    const story = await validateStoryOwnership(userId, storyId, session);
+    const scenesTimeLimit = await SceneModel.aggregate([
+      {
+        $match: {
+          storyId: new mongoose.Types.ObjectId(storyId),
+          userId: userId,
+          active: true,
+          deletedAt: { $exists: false },
+        },
+      },
+      { $group: { _id: null, totalDuration: { $sum: '$duration' } } },
+    ]).session(session);
+    const currentSceneDuration = scene.duration ?? 0;
+    const newTotalDuration = (scenesTimeLimit[0]?.totalDuration ?? 0) - currentSceneDuration + duration;
+    if (story?.timeLimit && newTotalDuration > story.timeLimit) {
+      throw new BadRequestError('Updating duration exceeds story time limit');
+    }
+    const updatedScene = await SceneModel.findByIdAndUpdate(
+      sceneId,
+      { $set: { duration } },
+      { new: true, runValidators: true, session }
+    );
+    if (!updatedScene) {
+      throw new NotFoundError('Scene not found');
+    }
+    return updatedScene;
+  });
 }
 
 export async function moveSceneByOne(
@@ -860,11 +845,8 @@ export async function moveSceneByOne(
   sceneId: string,
   direction: 'prev' | 'next'
 ): Promise<{ moved: Scene; swappedWith: Scene }> {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
-  try {
-    const scene = await validateSceneOwnership(userId, sceneId, { session });
+  return withTransaction(async (session) => {
+    const scene = await validateSceneOwnership(userId, sceneId, session);
     assertSceneNotDeleted(scene);
 
     const operator = direction === 'prev' ? '$lt' : '$gt';
@@ -912,36 +894,59 @@ export async function moveSceneByOne(
       moved: updatedScene,
       swappedWith: updatedNeighbor,
     };
-  } catch (error) {
-    await session.abortTransaction();
-    throw error;
-  } finally {
-    session.endSession();
+  });
+}
+
+export async function reactivateScene(userId: string, sceneId: string): Promise<Scene> {
+  const scene = await validateSceneOwnership(userId, sceneId);
+  assertSceneNotDeleted(scene);
+
+  const nextOrder = await getNextOrderValue(scene.storyId.toString());
+
+  const updatedScene = await SceneModel.findByIdAndUpdate(
+    sceneId,
+    { $set: { active: true, order: nextOrder } },
+    { new: true, runValidators: true }
+  );
+  if (!updatedScene) {
+    throw new NotFoundError('Scene not found');
   }
+  return updatedScene;
+}
+
+export async function deactivateScene(userId: string, sceneId: string): Promise<Scene> {
+  const scene = await validateSceneOwnership(userId, sceneId);
+  assertSceneNotDeleted(scene);
+  assertSceneIsActive(scene);
+  const updatedScene = await SceneModel.findByIdAndUpdate(
+    sceneId,
+    { $set: { active: false, order: -(Date.now() * 1000) } },
+    { new: true, runValidators: true }
+  );
+  if (!updatedScene) {
+    throw new NotFoundError('Scene not found');
+  }
+  return updatedScene;
 }
 
 export async function softDeleteScene(userId: string, sceneId: string): Promise<boolean> {
   const scene = await validateSceneOwnership(userId, sceneId);
   assertSceneNotDeleted(scene);
 
-  await SceneModel.findByIdAndUpdate(sceneId, { $set: { deletedAt: new Date(), order: -Date.now() } });
+  await SceneModel.findByIdAndUpdate(sceneId, {
+    $set: { deletedAt: new Date(), order: -Date.now(), active: false },
+  });
   return true;
 }
 
 export async function restoreScene(userId: string, sceneId: string): Promise<Scene> {
   const scene = await validateSceneOwnership(userId, sceneId);
   assertSceneIsDeleted(scene);
-  const maxOrderScene = await SceneModel.findOne({
-    storyId: scene.storyId,
-    userId,
-    deletedAt: { $exists: false },
-  })
-    .sort({ order: -1 })
-    .lean();
-  const newOrder = maxOrderScene ? maxOrderScene.order + SCENE_ORDER_GAP : SCENE_ORDER_GAP;
+
+  const newOrder = await getNextOrderValue(scene.storyId.toString());
   const restoredScene = await SceneModel.findByIdAndUpdate(
     sceneId,
-    { $unset: { deletedAt: '' }, $set: { order: newOrder } },
+    { $unset: { deletedAt: '' }, $set: { order: newOrder, active: true } },
     { new: true, runValidators: true }
   );
   if (!restoredScene) {
@@ -950,13 +955,20 @@ export async function restoreScene(userId: string, sceneId: string): Promise<Sce
   return restoredScene;
 }
 
+export async function permanentDeleteScene(userId: string, sceneId: string): Promise<boolean> {
+  const scene = await validateSceneOwnership(userId, sceneId);
+  assertSceneIsDeleted(scene);
+  await SceneModel.findByIdAndDelete(sceneId);
+  return true;
+}
+
 // FUTURE IMPLEMENTATION: Permanent delete scene
 export async function duplicateScene(userId: string, sceneId: string): Promise<Scene> {
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
-    const scene = await validateSceneOwnership(userId, sceneId, { session });
+    const scene = await validateSceneOwnership(userId, sceneId, session);
     assertSceneNotDeleted(scene);
 
     const newOrder = await getNextOrderValue(scene.storyId.toString(), session);
@@ -986,9 +998,4 @@ export async function duplicateScene(userId: string, sceneId: string): Promise<S
   } finally {
     session.endSession();
   }
-}
-
-export async function purgeDeletedScenes(userId: string, storyId: string): Promise<number> {
-  await validateStoryOwnership(userId, storyId);
-  return 0;
 }

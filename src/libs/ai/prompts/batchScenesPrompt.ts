@@ -1,21 +1,15 @@
 import { ContextProfile } from '@models/ContextProfile.js';
 import { GLOBAL_SAFETY_RULES } from '../constants/globalSafetyRules.js';
-import { buildStoryContextSection } from './utils/buildStoryContextSection.js';
+import { buildContextSection } from './utils/buildContextSection.js';
 import { Platform, StoryIntent } from '@constants/storyConsts.js';
 import {
   MULTI_SCENE_GENERATION_PROMPT,
   MULTI_SCENE_REGENERATION_PROMPT,
-  MULTI_SCENE_STRUCTURE_FORMAT, 
+  MULTI_SCENE_STRUCTURE_FORMAT,
 } from '../constants/scenesPromptConts.js';
+import { StoryContent } from 'types/index.js';
 
 export type BatchSceneMode = 'generate' | 'regenerate';
-
-type StoryContent = {
-  summary?: string;
-  body?: string;
-  keywords?: string[];
-  tags?: string[];
-};
 
 type BuildBatchScenePromptInput = {
   mode: BatchSceneMode;
@@ -49,41 +43,46 @@ export function batchScenesPrompt(input: BuildBatchScenePromptInput): string {
   const sections: string[] = [];
 
   // ROLE
-  sections.push(`
+  sections.push(
+    `
 You are a professional cinematic storyteller.
 You write structured, coherent, visually rich scenes.
 Follow all constraints exactly.
 Do not explain your reasoning.
-`.trim());
+`.trim()
+  );
 
   // MODE FRAMING
   sections.push(
-    mode === 'generate'
-      ? MULTI_SCENE_GENERATION_PROMPT.trim()
-      : MULTI_SCENE_REGENERATION_PROMPT.trim()
+    mode === 'generate' ? MULTI_SCENE_GENERATION_PROMPT.trim() : MULTI_SCENE_REGENERATION_PROMPT.trim()
   );
 
   // STORY CONTEXT
-  sections.push(`
+  sections.push(
+    `
 STORY CONTEXT
 Title: "${storyTitle}"
 Summary: "${storyContent.summary}"
 Platform: ${platform}
 Intent: ${intent}
-`.trim());
+`.trim()
+  );
 
   // STYLE CONTEXT (optional but useful)
   if (storyContent.keywords?.length || storyContent.tags?.length) {
-    sections.push(`
+    sections.push(
+      `
 STYLE HINTS
 Keywords: ${storyContent.keywords?.join(', ') || 'N/A'}
 Tags: ${storyContent.tags?.join(', ') || 'N/A'}
-`.trim());
+`.trim()
+    );
   }
 
   // FULL STORY BODY — only for continuity
   if (storyContent.body) {
-    sections.push(`
+    sections.push(
+      `
 FULL STORY REFERENCE (FOR CONTINUITY ONLY)
 
 ${storyContent.body}
@@ -94,11 +93,13 @@ Rules:
 - Do NOT summarize it
 - Do NOT restate it
 - Use it only to preserve continuity and logic
-`.trim());
+`.trim()
+    );
   }
 
   // SCENE COUNT CONSTRAINT
-  sections.push(`
+  sections.push(
+    `
 SCENE COUNT CONSTRAINT
 
 You must output EXACTLY ${totalScenes} scenes.
@@ -106,12 +107,14 @@ Do NOT add scenes.
 Do NOT remove scenes.
 Do NOT merge scenes.
 Do NOT skip scenes.
-`.trim());
+`.trim()
+  );
 
   // TIME BUDGET
   if (storyTimeLimit) {
     const perSceneTimeLimit = Math.floor(storyTimeLimit / totalScenes);
-    sections.push(`
+    sections.push(
+      `
 TIME BUDGET
 
 Total story duration: ${storyTimeLimit} seconds
@@ -120,21 +123,24 @@ Target per scene: ~${perSceneTimeLimit} seconds
 Rules:
 - Minor variation is allowed
 - Do NOT significantly overshoot or undershoot
-`.trim());
+`.trim()
+    );
   }
 
   // CONTEXT PROFILE
   if (contextProfile) {
-    const contextSection = buildStoryContextSection(contextProfile);
+    const contextSection = buildContextSection(contextProfile);
     if (contextSection) sections.push(contextSection);
   }
 
   // EXTRA PROMPT (mainly for regeneration tuning)
   if (extraPrompt) {
-    sections.push(`
+    sections.push(
+      `
 ADDITIONAL CREATIVE DIRECTION
 ${extraPrompt}
-`.trim());
+`.trim()
+    );
   }
 
   // SAFETY

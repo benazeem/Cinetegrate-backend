@@ -1,4 +1,4 @@
-import { Request, Response } from "express";
+import { Request, Response } from 'express';
 import {
   createProject,
   createProjectContextProfile,
@@ -14,15 +14,15 @@ import {
   updateProjectById,
   updateProjectStatus,
   updateProjectVisibility,
-} from "./project.service.js";
-import { Types } from "mongoose";
+} from './project.service.js';
+import { Types } from 'mongoose';
 import {
   CreateProjectInput,
   UpdateProjectInput,
   UpdateManyIdsInput,
   CreateProjectContextInput,
-} from "@validation/project.schema.js";
-import { paginationResponse } from "@utils/paginationResponse.js";
+} from '@validation/project.schema.js';
+import { paginationResponse } from '@utils/paginationResponse.js';
 
 export const getProjectsController = async (req: Request, res: Response) => {
   const pagination = req?.pagination!;
@@ -38,18 +38,11 @@ export const getProjectsController = async (req: Request, res: Response) => {
   });
 };
 
-export const getDeletedProjectsController = async (
-  req: Request,
-  res: Response
-) => {
+export const getDeletedProjectsController = async (req: Request, res: Response) => {
   const pagination = req?.pagination!;
   const sorting = req?.sorting!;
   const userId = req.user!.id;
-  const [projects, total] = await getDeletedProjects(
-    userId,
-    pagination,
-    sorting
-  );
+  const [projects, total] = await getDeletedProjects(userId, pagination, sorting);
   const paginationRes = paginationResponse(pagination, total as number);
   return res.status(200).json({
     items: projects,
@@ -58,18 +51,11 @@ export const getDeletedProjectsController = async (
     },
   });
 };
-export const getArchivedProjectsController = async (
-  req: Request,
-  res: Response
-) => {
+export const getArchivedProjectsController = async (req: Request, res: Response) => {
   const pagination = req?.pagination!;
   const sorting = req?.sorting!;
   const userId = req.user!.id;
-  const [projects, total] = await getArchivedProjects(
-    userId,
-    pagination,
-    sorting
-  );
+  const [projects, total] = await getArchivedProjects(userId, pagination, sorting);
   const paginationRes = paginationResponse(pagination, total as number);
   return res.status(200).json({
     items: projects,
@@ -93,25 +79,15 @@ export const getProjectByIdController = async (req: Request, res: Response) => {
   return res.status(200).json(project);
 };
 
-export const createProjectContextProfileController = async (
-  req: Request,
-  res: Response
-) => {
+export const createProjectContextProfileController = async (req: Request, res: Response) => {
   const projectId = req.params.projectId;
   const payload = req.validatedBody as CreateProjectContextInput;
   const userId = req.user!.id;
-  const newProject = await createProjectContextProfile(
-    userId,
-    projectId,
-    payload
-  );
+  const newProject = await createProjectContextProfile(userId, projectId, payload);
   return res.status(201).json(newProject);
 };
 
-export const updateProjectByIdController = async (
-  req: Request,
-  res: Response
-) => {
+export const updateProjectByIdController = async (req: Request, res: Response) => {
   const projectId = req.params.projectId as Types.ObjectId | string;
   const updates = req.validatedBody as UpdateProjectInput;
   const userId = req.user!.id;
@@ -119,20 +95,14 @@ export const updateProjectByIdController = async (
   return res.status(200).json(updatedProject);
 };
 
-export const deleteProjectByIdController = async (
-  req: Request,
-  res: Response
-) => {
+export const deleteProjectByIdController = async (req: Request, res: Response) => {
   const projectId = req.params.projectId as Types.ObjectId | string;
   const userId = req.user!.id;
   const response = await deleteProjectById(projectId, userId);
   return res.status(200).json(response);
 };
 
-export const updateProjectStatusController = async (
-  req: Request,
-  res: Response
-) => {
+export const updateProjectStatusController = async (req: Request, res: Response) => {
   const projectId = req.params.projectId as Types.ObjectId | string;
   const { status } = req.body;
   const userId = req.user!.id;
@@ -140,45 +110,29 @@ export const updateProjectStatusController = async (
   return res.status(200).json(updatedProject);
 };
 
-export const updateProjectVisibilityController = async (
-  req: Request,
-  res: Response
-) => {
+export const updateProjectVisibilityController = async (req: Request, res: Response) => {
   const projectId = req.params.projectId as Types.ObjectId | string;
   const { visibility } = req.body;
   const userId = req.user!.id;
-  const updatedProject = await updateProjectVisibility(
-    projectId,
-    userId,
-    visibility
-  );
+  const updatedProject = await updateProjectVisibility(projectId, userId, visibility);
   return res.status(200).json(updatedProject);
 };
 
-export const restoreProjectByIdController = async (
-  req: Request,
-  res: Response
-) => {
+export const restoreProjectByIdController = async (req: Request, res: Response) => {
   const projectId = req.params.projectId as Types.ObjectId | string;
   const userId = req.user!.id;
   const restoredProject = await restoreProjectById(projectId, userId);
   return res.status(200).json(restoredProject);
 };
 
-export const unarchiveProjectByIdController = async (
-  req: Request,
-  res: Response
-) => {
+export const unarchiveProjectByIdController = async (req: Request, res: Response) => {
   const projectId = req.params.projectId as Types.ObjectId | string;
   const userId = req.user!.id;
   const unarchivedProject = await unarchiveProjectById(projectId, userId);
   return res.status(200).json(unarchivedProject);
 };
 
-export const restoreManyProjectsController = async (
-  req: Request,
-  res: Response
-) => {
+export const restoreManyProjectsController = async (req: Request, res: Response) => {
   const { projectIds } = req.validatedBody as UpdateManyIdsInput;
   const userId = req.user!.id;
   const restoredProjects = await restoreManyProjectsByIds(projectIds, userId);
@@ -186,16 +140,10 @@ export const restoreManyProjectsController = async (
   return res.status(200).json(restoredProjects);
 };
 
-export const unarchiveManyProjectsController = async (
-  req: Request,
-  res: Response
-) => {
+export const unarchiveManyProjectsController = async (req: Request, res: Response) => {
   const { projectIds } = req.validatedBody as UpdateManyIdsInput;
   const userId = req.user!.id;
-  const unarchivedProjects = await unarchiveManyProjectsByIds(
-    projectIds,
-    userId
-  );
+  const unarchivedProjects = await unarchiveManyProjectsByIds(projectIds, userId);
 
   return res.status(200).json(unarchivedProjects);
 };

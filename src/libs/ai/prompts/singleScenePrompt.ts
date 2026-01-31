@@ -1,6 +1,6 @@
 import { ContextProfile } from '@models/ContextProfile.js';
 import { GLOBAL_SAFETY_RULES } from '../constants/globalSafetyRules.js';
-import { buildStoryContextSection } from './utils/buildStoryContextSection.js';
+import { buildContextSection } from './utils/buildContextSection.js';
 import { Platform, StoryIntent } from '@constants/storyConsts.js';
 import {
   SINGLE_SCENE_GENERATION_PROMPT,
@@ -9,14 +9,9 @@ import {
   SCENE_STRUCTURE_FORMAT,
 } from '../constants/scenesPromptConts.js';
 import { BadRequestError } from '@middleware/error/index.js';
+import { StoryContent } from 'types/index.js';
 
 export type SingleSceneMode = 'generate' | 'variation' | 'regenerate';
-
-type StoryContent = {
-  summary?: string;
-  keywords?: string[];
-  tags?: string[];
-};
 
 type BuildSingleScenePromptInput = {
   mode: SingleSceneMode;
@@ -229,7 +224,7 @@ Do not significantly overrun or underrun.
   }
 
   if (contextProfile) {
-    const contextSection = buildStoryContextSection(contextProfile);
+    const contextSection = buildContextSection(contextProfile);
     if (contextSection) sections.push(contextSection);
   }
 

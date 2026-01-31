@@ -1,31 +1,19 @@
 import { Schema, model, Document, Types } from 'mongoose';
 
-// export interface SceneAssetHistoryEntry {
-//   assetId: Types.ObjectId;
-//   replacedAt: Date;
-// }
-
-// export interface SceneEditHistoryEntry {
-//   title?: string;
-//   description?: string;
-//   imagePrompt?: string;
-//   duration?: number;
-//   editedAt: Date;
-// }
-
-// Put all history tracking in SceneRevision model later
-
+//RULE: deletedAt != null  ⇒ active must be false
 export interface Scene extends Document {
   userId: Types.ObjectId;
   storyId: Types.ObjectId;
   order: number;
   title?: string;
   description: string;
+  narrativeRole: 'intro' | 'transition' | 'climax' | 'outro' | 'standard';
   authorType: 'ai' | 'user';
   imagePrompt: string;
   videoPrompt: string;
   duration?: number;
   activeAssetId?: Types.ObjectId;
+  active: boolean;
   deletedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -62,6 +50,11 @@ const sceneSchema = new Schema<Scene>(
       type: String,
       required: true,
     },
+    narrativeRole: {
+      type: String,
+      enum: ['intro', 'transition', 'climax', 'outro', 'standard'],
+      default: 'standard',
+    },
     authorType: {
       type: String,
       enum: ['ai', 'user'],
@@ -78,10 +71,18 @@ const sceneSchema = new Schema<Scene>(
     duration: {
       type: Number,
     },
+    activeAssetId: {
+      type: Schema.Types.ObjectId,
+      ref: 'SceneAsset',
+    },
+    active: {
+      type: Boolean,
+      required: true,
+      default: true,
+    },
     deletedAt: {
       type: Date,
-      default: undefined,
-      index: true,
+      default: undefined, 
     },
   },
   { timestamps: true }

@@ -5,19 +5,26 @@ import {
   getAllScenesForStory,
   updateScene,
   softDeleteScene,
+  permanentDeleteScene,
   restoreScene,
   bulkReorder,
   generateSceneWithAI,
   regenerateScene,
   generateAllScenes,
   regenerateAllScenes,
-  duplicateScene,
   moveSceneByOne,
   getSceneCount,
+  softdeleteAllScenes,
   restoreAllDeletedScenes,
+  permanentDeleteAllScenes,
   bulkRestoreScenes,
+  bulkSoftdeleteScenes,
+  bulkPermanentDeleteScenes,
   updateSceneDuration,
   getAllDeletedScenes,
+  reactivateScene,
+  getAllInactiveScenesForStory,
+  deactivateScene,
 } from './scenes.service.js';
 import type {
   CreateSceneInput,
@@ -44,7 +51,17 @@ export const getAllStoryScenesController = async (req: Request, res: Response) =
   });
 };
 
-export const getAllDeltedScenesController = async (req: Request, res: Response) => {
+export const getAllInactiveStoryScenesController = async (req: Request, res: Response) => {
+  const userId = req.user!.id;
+  const storyId = req.params.storyId;
+  const scenes = await getAllInactiveScenesForStory(userId, storyId);
+  res.status(200).json({
+    message: 'Inactive scenes retrieved successfully',
+    data: scenes,
+  });
+};
+
+export const getAllDeletedScenesController = async (req: Request, res: Response) => {
   const userId = req.user!.id;
   const storyId = req.params.storyId;
 
@@ -52,6 +69,36 @@ export const getAllDeltedScenesController = async (req: Request, res: Response) 
 
   res.status(200).json({
     message: 'Scenes retrieved successfully',
+    data: scenes,
+  });
+};
+
+export const softDeleteAllScenesController = async (req: Request, res: Response) => {
+  const userId = req.user!.id;
+  const storyId = req.params.storyId;
+  const scenes = await softdeleteAllScenes(userId, storyId);
+  res.status(200).json({
+    message: 'All scenes soft deleted successfully',
+    data: scenes,
+  });
+};
+
+export const permanentDeleteAllScenesController = async (req: Request, res: Response) => {
+  const userId = req.user!.id;
+  const storyId = req.params.storyId;
+  const deletedCount = await permanentDeleteAllScenes(userId, storyId);
+  res.status(200).json({
+    message: 'All deleted scenes permanently deleted successfully',
+    data: { deletedCount },
+  });
+};
+
+export const restoreAllDeletedScenesController = async (req: Request, res: Response) => {
+  const userId = req.user!.id;
+  const storyId = req.params.storyId;
+  const scenes = await restoreAllDeletedScenes(userId, storyId);
+  res.status(200).json({
+    message: 'All deleted scenes restored successfully',
     data: scenes,
   });
 };
@@ -82,16 +129,6 @@ export const regenerateScenesController = async (req: Request, res: Response) =>
   });
 };
 
-export const restoreAllDeletedScenesController = async (req: Request, res: Response) => {
-  const userId = req.user!.id;
-  const storyId = req.params.storyId;
-  const scenes = await restoreAllDeletedScenes(userId, storyId);
-  res.status(200).json({
-    message: 'All deleted scenes restored successfully',
-    data: scenes,
-  });
-};
-
 // BULK SCENES CONTROLLERS
 
 export const bulkReorderController = async (req: Request, res: Response) => {
@@ -115,6 +152,28 @@ export const bulkRestoreScenesController = async (req: Request, res: Response) =
   res.status(200).json({
     message: 'Scenes restored successfully',
     data: restoredScenes,
+  });
+};
+
+export const bulkSoftDeleteScenesController = async (req: Request, res: Response) => {
+  const userId = req.user!.id;
+  const storyId = req.params.storyId;
+  const { sceneIds } = req.validatedBody as BulkRestoreInput;
+  const deletedScenes = await bulkSoftdeleteScenes(userId, storyId, sceneIds);
+  res.status(200).json({
+    message: 'Scenes soft deleted successfully',
+    data: deletedScenes,
+  });
+};
+
+export const bulkPermanentDeleteScenesController = async (req: Request, res: Response) => {
+  const userId = req.user!.id;
+  const storyId = req.params.storyId;
+  const { sceneIds } = req.validatedBody as BulkRestoreInput;
+  const deletedCount = await bulkPermanentDeleteScenes(userId, storyId, sceneIds);
+  res.status(200).json({
+    message: 'Scenes permanently deleted successfully',
+    data: { deletedCount },
   });
 };
 
@@ -187,15 +246,16 @@ export const updateSceneController = async (req: Request, res: Response) => {
 export const updateSceneDurationController = async (req: Request, res: Response) => {
   const userId = req.user!.id;
   const sceneId = req.params.sceneId;
+  const storyId = req.params.storyId;
   const { duration } = req.validatedBody as DurationInput;
-  const scene = await updateSceneDuration(userId, sceneId, duration);
+  const scene = await updateSceneDuration(userId, storyId, sceneId, duration);
   res.status(200).json({
     message: 'Scene duration updated successfully',
     data: scene,
   });
 };
 
-export const deleteSceneController = async (req: Request, res: Response) => {
+export const softDeleteSceneController = async (req: Request, res: Response) => {
   const userId = req.user!.id;
   const sceneId = req.params.sceneId;
 
@@ -203,6 +263,16 @@ export const deleteSceneController = async (req: Request, res: Response) => {
 
   res.status(200).json({
     message: 'Scene deleted successfully',
+    data: { deleted },
+  });
+};
+
+export const permanentDeleteSceneController = async (req: Request, res: Response) => {
+  const userId = req.user!.id;
+  const sceneId = req.params.sceneId;
+  const deleted = await permanentDeleteScene(userId, sceneId);
+  res.status(200).json({
+    message: 'Scene permanently deleted successfully',
     data: { deleted },
   });
 };
@@ -215,6 +285,26 @@ export const restoreSceneController = async (req: Request, res: Response) => {
 
   res.status(200).json({
     message: 'Scene restored successfully',
+    data: scene,
+  });
+};
+
+export const reactivateSceneController = async (req: Request, res: Response) => {
+  const userId = req.user!.id;
+  const sceneId = req.params.sceneId;
+  const scene = await reactivateScene(userId, sceneId);
+  res.status(200).json({
+    message: 'Scene reactivated successfully',
+    data: scene,
+  });
+};
+
+export const deactivateSceneController = async (req: Request, res: Response) => {
+  const userId = req.user!.id;
+  const sceneId = req.params.sceneId;
+  const scene = await deactivateScene(userId, sceneId);
+  res.status(200).json({
+    message: 'Scene deactivated successfully',
     data: scene,
   });
 };

@@ -1,7 +1,7 @@
 import { ContextProfile } from '@models/ContextProfile.js';
 import { GLOBAL_SAFETY_RULES } from '../constants/globalSafetyRules.js';
 import { STORY_GENERATION_FORMAT } from '../constants/storyPromptConts.js';
-import { buildStoryContextSection } from './utils/buildStoryContextSection.js';
+import { buildContextSection } from './utils/buildContextSection.js';
 import { calculateWordLimits } from '../constants/calculateWordLimits.js';
 import { Platform, StoryIntent } from '@constants/storyConsts.js';
 
@@ -44,7 +44,10 @@ Description: "${description}"
 
   /* 3. HARD TIME / LENGTH CONSTRAINT */
   if (timeLimit) {
-    const { targetWords, minWords, maxWords } = calculateWordLimits(timeLimit, contextProfile?.narrationProfile);
+    const { targetWords, minWords, maxWords } = calculateWordLimits(
+      timeLimit,
+      contextProfile?.narrationProfile
+    );
 
     sections.push(
       `
@@ -64,7 +67,7 @@ Rules:
 
   /* 4. CONTEXT PROFILE (BINDING, NO EXPANSION) */
   if (contextProfile) {
-    const contextSection = buildStoryContextSection(contextProfile);
+    const contextSection = buildContextSection(contextProfile);
     if (contextSection) {
       sections.push(contextSection);
     }

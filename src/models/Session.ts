@@ -1,4 +1,4 @@
-import { HydratedDocument, InferSchemaType, model, Schema } from "mongoose";
+import { HydratedDocument, InferSchemaType, model, Schema } from 'mongoose';
 
 const sessionSchema = new Schema({
   sessionId: { type: String, required: true, index: true },
@@ -39,12 +39,10 @@ const sessionSchema = new Schema({
   valid: { type: Boolean, default: true },
 });
 
-//TTL index: automatically remove sessions not used for 30 days
-sessionSchema.index(
-  { lastUsedAt: 1 },
-  { expireAfterSeconds: 30 * 24 * 60 * 60 }
-); 
-//TTL index: automatically remove revoked sessions after 7 days 
+//TTL index: automatically remove sessions not used for 25 days
+sessionSchema.index({ lastUsedAt: 1 }, { expireAfterSeconds: 25 * 24 * 60 * 60 });
+
+//TTL index: automatically remove revoked sessions after 7 days
 sessionSchema.index(
   { revokedAt: 1 },
   {
@@ -59,4 +57,4 @@ sessionSchema.index({ userId: 1, lastUsedAt: -1 });
 export type SessionData = InferSchemaType<typeof sessionSchema>;
 export type Session = HydratedDocument<SessionData>;
 
-export const SessionModel = model<SessionData>("Session", sessionSchema);
+export const SessionModel = model<SessionData>('Session', sessionSchema);

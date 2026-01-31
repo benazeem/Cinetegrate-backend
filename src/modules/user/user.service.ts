@@ -1,52 +1,41 @@
-import bcrypt from "bcrypt";
+import bcrypt from 'bcrypt';
 import {
   BadRequestError,
   ConflictError,
   InternalServerError,
   NotFoundError,
   UnauthenticatedError,
-} from "@middleware/error/index.js";
-import { SessionModel } from "@models/Session.js";
-import { type User, UserModel } from "@models/User.js";
-import { returnUserData } from "@utils/returnUserData.js";
-import {
-  UpdateNotificationsType,
-  UpdatePrivacySettingsType,
-} from "@validation/user.schema.js";
-import mongoose from "mongoose";
-import { generateVerificationToken } from "@utils/tokens.js";
-import sendUpdateEmailLink from "@utils/emails/sender/sendUpdateEmailLink.js";
-import sendOldEmailVerificationForEmailUpdate from "@utils/emails/sender/sendOldEmailVerificationForEmailUpdate.js";
+} from '@middleware/error/index.js';
+import { SessionModel } from '@models/Session.js';
+import { type User, UserModel } from '@models/User.js';
+import { sanitizeUserResponse } from '@utils/sanitizeUserResponse.js';
+import { UpdateNotificationsType, UpdatePrivacySettingsType } from '@validation/user.schema.js';
+import { generateVerificationToken } from '@utils/tokens.js';
+import sendUpdateEmailLink from '@utils/emails/sender/sendUpdateEmailLink.js';
+import sendOldEmailVerificationForEmailUpdate from '@utils/emails/sender/sendOldEmailVerificationForEmailUpdate.js';
+import { withTransaction } from '@db/withTransaction.js';
 
 export const getProfile = async (userId: string): Promise<User> => {
   const user = await UserModel.findById(userId)
-    .select(
-      "-passwordHash -emailVerificationToken -resetPasswordToken -createdAt -updatedAt"
-    )
+    .select('-passwordHash -emailVerificationToken -resetPasswordToken -createdAt -updatedAt')
     .catch((err) => {
-      throw new InternalServerError(
-        "Could not fetch user profile",
-        err.message
-      );
+      throw new InternalServerError('Could not fetch user profile', err.message);
     });
   if (!user) {
-    throw new NotFoundError("User not found");
+    throw new NotFoundError('User not found');
   }
   return user;
 };
 
-export const updateProfile = async (
-  userId: string,
-  updateData: Partial<User>
-): Promise<Partial<User>> => {
+export const updateProfile = async (userId: string, updateData: Partial<User>): Promise<Partial<User>> => {
   const user = await UserModel.findByIdAndUpdate(userId, updateData, {
     new: true,
   });
 
   if (!user) {
-    throw new NotFoundError("User not found");
+    throw new NotFoundError('User not found');
   }
-  const resUser = returnUserData(user, "profile");
+  const resUser = sanitizeUserResponse(user, 'profile');
   return resUser;
 };
 
@@ -55,7 +44,7 @@ export const updateAvatar = async (
   avatarData: Express.Multer.File | undefined
 ): Promise<Partial<User>> => {
   if (!avatarData) {
-    throw new BadRequestError("Avatar file not found");
+    throw new BadRequestError('Avatar file not found');
   }
   const { filename, path } = avatarData;
 
@@ -63,62 +52,52 @@ export const updateAvatar = async (
   // For now, we will just use the filename as is
   const avatarUrl = `${path}/${filename}`;
 
-  const user = await UserModel.findByIdAndUpdate(
-    userId,
-    { avatarUrl: avatarUrl },
-    { new: true }
-  );
+  const user = await UserModel.findByIdAndUpdate(userId, { avatarUrl: avatarUrl }, { new: true });
   if (!user) {
-    throw new NotFoundError("User not found");
+    throw new NotFoundError('User not found');
   }
-  const resUser = returnUserData(user, "profile");
+  const resUser = sanitizeUserResponse(user, 'profile');
   return resUser;
 };
 
 export const deleteAvatar = async (userId: string): Promise<void> => {
   const user = await UserModel.findById(userId);
   if (!user) {
-    throw new NotFoundError("User not found");
+    throw new NotFoundError('User not found');
   }
-  /**
+  const oldAvatarUrl = user.avatarUrl;
+
+  /** TODO:
    * Retrieves the current avatar URL from the user object before updating it.
    * This variable stores the old avatar URL to enable cleanup of the previous avatar file
    * from cloud storage if a new avatar is uploaded during the update process.
    * If no avatar currently exists, this will be undefined or null, and the cleanup step should be skipped.
    */
-  const oldAvatarUrl = user.avatarUrl;
   if (!oldAvatarUrl) {
     return;
   }
-  //TODO Add logic to delete the avatar file from storage if necessary
 
-  await UserModel.findByIdAndUpdate(
-    userId,
-    { $unset: { avatarUrl: "" } },
-    { new: true }
-  );
+  await UserModel.findByIdAndUpdate(userId, { $unset: { avatarUrl: '' } }, { new: true });
   return;
 };
 
 export const getSettings = async (userId: string): Promise<Partial<User>> => {
-  const user = await UserModel.findById(userId).select(
-    "emailNotifications privacySettings"
-  );
+  const user = await UserModel.findById(userId).select('emailNotifications privacySettings');
   if (!user) {
-    throw new Error("User not found");
+    throw new Error('User not found');
   }
-  const resUser = returnUserData(user as User, "settings");
+  const resUser = sanitizeUserResponse(user as User, 'settings');
   return resUser;
 };
 
 export const getSecurity = async (userId: string): Promise<Partial<User>> => {
   const user = await UserModel.findById(userId).select(
-    "email phoneNumber passwordHash emailVerified phoneVerified lastPasswordChangeAt twoFactorEnabled oauthProviders"
+    'email phoneNumber passwordHash emailVerified phoneVerified lastPasswordChangeAt twoFactorEnabled oauthProviders'
   );
   if (!user) {
-    throw new NotFoundError("User not found");
+    throw new NotFoundError('User not found');
   }
-  const resUser = returnUserData(user as User, "security");
+  const resUser = sanitizeUserResponse(user as User, 'security');
   return resUser;
 };
 
@@ -143,14 +122,9 @@ export const getSessions = async (
     return {
       sessionId: session.sessionId,
       current: session.sessionId === sessioId,
-      device:
-        session.device?.vendor +
-        " " +
-        session.device?.model +
-        " " +
-        session.device?.type,
-      browser: session.browser!.name + " " + session.browser!.version,
-      location: session.city + ", " + session.country,
+      device: session.device?.vendor + ' ' + session.device?.model + ' ' + session.device?.type,
+      browser: session.browser!.name + ' ' + session.browser!.version,
+      location: session.city + ', ' + session.country,
       createdAt: session.createdAt,
       lastUsedAt: session.lastUsedAt,
       revokedAt: session.revokedAt,
@@ -160,11 +134,11 @@ export const getSessions = async (
 };
 
 export const getBilling = async (userId: string): Promise<Partial<User>> => {
-  const user = await UserModel.findById(userId).select("plan billingInfo");
+  const user = await UserModel.findById(userId).select('plan billingInfo');
   if (!user) {
-    throw new NotFoundError("User not found");
+    throw new NotFoundError('User not found');
   }
-  const resUser = returnUserData(user as User, "billing");
+  const resUser = sanitizeUserResponse(user as User, 'billing');
   return resUser;
 };
 
@@ -175,27 +149,22 @@ export const updateNotifications = async (
   const update: Record<string, any> = {};
 
   if (notificationPrefs.emailNotifications !== undefined) {
-    update["notificationPrefs.emailOnJobComplete"] =
-      notificationPrefs.emailNotifications;
+    update['notificationPrefs.emailOnJobComplete'] = notificationPrefs.emailNotifications;
   }
 
   if (notificationPrefs.pushNotifications !== undefined) {
-    update["notificationPrefs.inApp"] = notificationPrefs.pushNotifications;
+    update['notificationPrefs.inApp'] = notificationPrefs.pushNotifications;
   }
 
   if (notificationPrefs.newsletter !== undefined) {
-    update["notificationPrefs.marketingEmails"] = notificationPrefs.newsletter;
+    update['notificationPrefs.marketingEmails'] = notificationPrefs.newsletter;
   }
 
-  const user = await UserModel.findByIdAndUpdate(
-    userId,
-    { $set: update },
-    { new: true }
-  );
+  const user = await UserModel.findByIdAndUpdate(userId, { $set: update }, { new: true });
   if (!user) {
-    throw new NotFoundError("User not found");
+    throw new NotFoundError('User not found');
   }
-  const resUser = returnUserData(user as User, "settings");
+  const resUser = sanitizeUserResponse(user as User, 'settings');
   return resUser;
 };
 
@@ -205,28 +174,23 @@ export const updatePrivacySettings = async (
 ): Promise<Partial<User>> => {
   const update: Record<string, any> = {};
   if (privacyPrefs.profileVisibility !== undefined) {
-    update["privacyPrefs.profileVisibility"] = privacyPrefs.profileVisibility;
+    update['privacyPrefs.profileVisibility'] = privacyPrefs.profileVisibility;
   }
   if (privacyPrefs.showEmailOnProfile !== undefined) {
-    update["privacyPrefs.showEmailOnProfile"] = privacyPrefs.showEmailOnProfile;
+    update['privacyPrefs.showEmailOnProfile'] = privacyPrefs.showEmailOnProfile;
   }
   if (privacyPrefs.showLinksOnProfile !== undefined) {
-    update["privacyPrefs.showLinksOnProfile"] = privacyPrefs.showLinksOnProfile;
+    update['privacyPrefs.showLinksOnProfile'] = privacyPrefs.showLinksOnProfile;
   }
   if (privacyPrefs.allowDiscoverability !== undefined) {
-    update["privacyPrefs.allowDiscoverability"] =
-      privacyPrefs.allowDiscoverability;
+    update['privacyPrefs.allowDiscoverability'] = privacyPrefs.allowDiscoverability;
   }
 
-  const user = await UserModel.findByIdAndUpdate(
-    userId,
-    { $set: update },
-    { new: true }
-  );
+  const user = await UserModel.findByIdAndUpdate(userId, { $set: update }, { new: true });
   if (!user) {
-    throw new NotFoundError("User not found");
+    throw new NotFoundError('User not found');
   }
-  const resUser = returnUserData(user as User, "settings");
+  const resUser = sanitizeUserResponse(user as User, 'settings');
   return resUser;
 };
 
@@ -235,47 +199,42 @@ export const updatePassword = async (
   currentPassword: string,
   newPassword: string
 ): Promise<void> => {
-  const user = await UserModel.findById(userId).select(
-    "+passwordHash +changeHistory"
-  );
+  const user = await UserModel.findById(userId).select('+passwordHash +changeHistory');
   if (!user) {
-    throw new NotFoundError("User not found");
+    throw new NotFoundError('User not found');
   }
 
   const isMatch = await bcrypt.compare(currentPassword, user.passwordHash);
   if (!isMatch) {
-    throw new UnauthenticatedError("Current password is incorrect");
+    throw new UnauthenticatedError('Current password is incorrect');
   }
   const hashedPassword = await bcrypt.hash(newPassword, 10);
   user.lastPasswordChangeAt = new Date();
   user.passwordHash = hashedPassword;
   user.changeHistory.push({
-    field: "password",
+    field: 'password',
     by: user._id,
-    from: "",
-    to: "",
-    reason: "User initiated password change",
+    from: '',
+    to: '',
+    reason: 'User initiated password change',
     at: new Date(),
-    via: "user",
+    via: 'user',
   });
   await user.save();
   return;
 };
 
-export const updateEmail = async (
-  userId: string,
-  newEmail: string
-): Promise<void> => {
+export const updateEmail = async (userId: string, newEmail: string): Promise<void> => {
   const user = await UserModel.findById(userId);
   if (!user) {
-    throw new NotFoundError("User not found");
+    throw new NotFoundError('User not found');
   }
   if (user.email === newEmail) {
-    throw new ConflictError("New email is the same as the current email");
+    throw new ConflictError('New email is the same as the current email');
   }
   const emailInUse = await UserModel.findOne({ email: newEmail });
   if (emailInUse) {
-    throw new ConflictError("Email is already in use");
+    throw new ConflictError('Email is already in use');
   }
   const token = generateVerificationToken();
   const code = Math.floor(100000 + Math.random() * 900000)
@@ -283,9 +242,7 @@ export const updateEmail = async (
     .slice(0, 6);
   const codeHash = await bcrypt.hash(code, 10);
 
-  const updateEmailUrl = `${
-    process.env.APP_URL
-  }/verify-email-change?token=${encodeURIComponent(token.raw)}`;
+  const updateEmailUrl = `${process.env.APP_URL}/verify-email-change?token=${encodeURIComponent(token.raw)}`;
 
   user.pendingEmailChange = {
     newEmail: newEmail,
@@ -293,31 +250,28 @@ export const updateEmail = async (
     tokenHash: token.hash,
     expiresAt: new Date(Date.now() + 30 * 60 * 1000), // 30 minutes
     requestedAt: new Date(),
-    requestMethod: "self",
+    requestMethod: 'self',
   };
   await user.save();
 
-  console.log("Update Email URL:", updateEmailUrl, "code:", code);
+  console.log('Update Email URL:', updateEmailUrl, 'code:', code);
   // send verification code to old email
   sendOldEmailVerificationForEmailUpdate(user, code);
   sendUpdateEmailLink(user, newEmail, updateEmailUrl);
   return;
 };
 
-export const deleteSession = async (
-  userId: string,
-  sessionId: string
-): Promise<void> => {
+export const deleteSession = async (userId: string, sessionId: string): Promise<void> => {
   const session = await SessionModel.findOne({
     userId: userId,
     sessionId: sessionId,
   });
 
   if (!session) {
-    throw new NotFoundError("Session not found");
+    throw new NotFoundError('Session not found');
   }
   if (session.revokedAt) {
-    throw new BadRequestError("Session already revoked");
+    throw new BadRequestError('Session already revoked');
   }
 
   session.revokedAt = new Date();
@@ -338,31 +292,29 @@ export const deleteAllSessions = async (
   await SessionModel.updateMany(filter, { revokedAt: new Date(), valid: false })
     .exec()
     .catch((err) => {
-      throw new InternalServerError("Could not revoke sessions", err.message);
+      throw new InternalServerError('Could not revoke sessions', err.message);
     });
   return;
 };
 
 export const deleteAccount = async (userId: string): Promise<void> => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-  try {
+  return withTransaction(async (session) => {
     await UserModel.findByIdAndUpdate(
       userId,
       {
         deletedAt: new Date(),
-        accountStatus: "delete",
+        accountStatus: 'delete',
         $push: {
           changeHistory: {
             $each: [
               {
-                field: "accountStatus",
-                from: "active",
-                to: "delete",
+                field: 'accountStatus',
+                from: 'active',
+                to: 'delete',
                 by: userId,
-                reason: "User deleted account",
+                reason: 'User deleted account',
                 at: new Date(),
-                via: "user",
+                via: 'user',
               },
             ],
             $slice: -100,
@@ -372,42 +324,33 @@ export const deleteAccount = async (userId: string): Promise<void> => {
       { session }
     );
     await SessionModel.deleteMany({ userId }, { session });
-    await session.commitTransaction();
-  } catch (err) {
-    await session.abortTransaction();
-    throw new InternalServerError("Could not delete account", String(err));
-  } finally {
-    session.endSession();
-  }
-  return;
+  });
 };
 
-export const reactivateAccount = async (
-  userId: string
-): Promise<Partial<User>> => {
-  const user = await UserModel.findById(userId).select("+changeHistory +role");
+export const reactivateAccount = async (userId: string): Promise<Partial<User>> => {
+  const user = await UserModel.findById(userId).select('+changeHistory +role');
   if (!user) {
-    throw new NotFoundError("User not found");
+    throw new NotFoundError('User not found');
   }
-  if (user.accountStatus !== "deactive" && user.accountStatus !== "delete") {
+  if (user.accountStatus !== 'deactive' && user.accountStatus !== 'delete') {
     throw new BadRequestError(
-      "Account is not deactivated or deleted other than that cannot be reactivated. Contact support."
+      'Account is not deactivated or deleted other than that cannot be reactivated. Contact support.'
     );
   }
   const updatedUser = await UserModel.findByIdAndUpdate(
     userId,
     {
-      accountStatus: "active",
+      accountStatus: 'active',
       deletedAt: null,
       $push: {
         changeHistory: {
           $each: [
             {
-              field: "accountStatus",
+              field: 'accountStatus',
               from: user.accountStatus,
-              to: "active",
+              to: 'active',
               by: user._id,
-              reason: "Account reactivated",
+              reason: 'Account reactivated',
               at: new Date(),
               via: user.role,
             },
@@ -419,37 +362,32 @@ export const reactivateAccount = async (
     { new: true }
   );
   if (!updatedUser) {
-    throw new NotFoundError("User not found");
+    throw new NotFoundError('User not found');
   }
-  const resUser = returnUserData(updatedUser, "profile");
+  const resUser = sanitizeUserResponse(updatedUser, 'profile');
 
   return resUser;
 };
 
-export const deactivateAccount = async (
-  userId: string
-): Promise<Partial<User>> => {
-  const user = await UserModel.findById(userId).select("+changeHistory +role");
-  if (!user) {
-    throw new NotFoundError("User not found");
-  }
-
-  const session = await mongoose.startSession();
-  session.startTransaction();
-  try {
+export const deactivateAccount = async (userId: string): Promise<Partial<User>> => {
+  return withTransaction(async (session) => {
+    const user = await UserModel.findById(userId).select('+changeHistory +role');
+    if (!user) {
+      throw new NotFoundError('User not found');
+    }
     const updatedUser = await UserModel.findByIdAndUpdate(
       userId,
       {
-        accountStatus: "deactive",
+        accountStatus: 'deactive',
         $push: {
           changeHistory: {
             $each: [
               {
-                field: "accountStatus",
+                field: 'accountStatus',
                 from: user.accountStatus,
-                to: "deactive",
+                to: 'deactive',
                 by: user._id,
-                reason: "Account status updated",
+                reason: 'Account status updated',
                 at: new Date(),
                 via: user.role,
               },
@@ -466,16 +404,10 @@ export const deactivateAccount = async (
       },
       { session }
     );
-    await session.commitTransaction();
     if (!updatedUser) {
-      throw new NotFoundError("User not found");
+      throw new NotFoundError('User not found');
     }
-    const resUser = returnUserData(updatedUser, "profile");
+    const resUser = sanitizeUserResponse(updatedUser, 'profile');
     return resUser;
-  } catch (err) {
-    await session.abortTransaction();
-    throw new InternalServerError("Could not update account", String(err));
-  } finally {
-    session.endSession();
-  }
+  });
 };

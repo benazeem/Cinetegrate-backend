@@ -1,16 +1,13 @@
-import { Project } from "@models/Project.js";
+import { Project } from '@models/Project.js';
 
 interface ProjectResponse {
   project: Project;
-  type: "getProjects" | "getProjectById";
+  type: 'getProjects' | 'getProjectById';
 }
 
-const sanitizeProjectResponse = ({
-  project,
-  type = "getProjectById",
-}: ProjectResponse) => {
+const sanitizeProjectResponse = ({ project, type = 'getProjectById' }: ProjectResponse) => {
   switch (type) {
-    case "getProjects":
+    case 'getProjects':
       return {
         _id: project._id,
         title: project.title,
@@ -20,14 +17,14 @@ const sanitizeProjectResponse = ({
         createdAt: project.createdAt,
         updatedAt: project.updatedAt,
       };
-    case "getProjectById":
+    case 'getProjectById':
       return {
         _id: project._id,
         title: project.title,
         description: project.description,
         visibility: project.visibility,
         status: project.status,
-        contextProfileId: project.defaultContextProfileId, 
+        contextProfileId: project.defaultContextProfileId,
         generationCounts: project.generationCounts,
         createdAt: project.createdAt,
         updatedAt: project.updatedAt,
@@ -38,9 +35,7 @@ const sanitizeProjectResponse = ({
 };
 
 const sanitizeProjects = (projects: Project[]) => {
-  return projects.map((project) =>
-    sanitizeProjectResponse({ project, type: "getProjects" })
-  );
+  return projects.map((project) => sanitizeProjectResponse({ project, type: 'getProjects' }));
 };
 
 export { sanitizeProjectResponse, sanitizeProjects };

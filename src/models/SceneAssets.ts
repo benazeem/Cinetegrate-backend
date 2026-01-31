@@ -1,18 +1,20 @@
-import { Schema, model, Document, Types } from "mongoose";
+import { allFormats, type AssetFormat } from '@constants/sceneAssetConsts.js';
+import { Schema, model, Document, Types } from 'mongoose';
 
 export interface SceneAsset extends Document {
   userId: Types.ObjectId;
-  projectId?: Types.ObjectId;
-  type: "image" | "video";
+  sceneId: Types.ObjectId;
+  type: 'image' | 'video';
   url: string;
-  visibility: "private" | "public";
+  visibility: 'private' | 'public';
   prompt?: string;
-  generationSource: "ai" | "upload";
-  saved: boolean;
-  active: boolean;
+  generationSource: 'ai' | 'user';
+  version: number;
   width?: number;
   height?: number;
+  format?: AssetFormat;
   duration?: number;
+  deletedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -21,18 +23,19 @@ const sceneAssetSchema = new Schema<SceneAsset>(
   {
     userId: {
       type: Schema.Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       required: true,
       index: true,
     },
-    projectId: {
+    sceneId: {
       type: Schema.Types.ObjectId,
-      ref: "Project",
+      ref: 'Scene',
+      required: true,
       index: true,
     },
     type: {
       type: String,
-      enum: ["image", "video"],
+      enum: ['image', 'video'],
       required: true,
     },
     url: {
@@ -41,35 +44,45 @@ const sceneAssetSchema = new Schema<SceneAsset>(
     },
     visibility: {
       type: String,
-      enum: ["private", "public"],
-      default: "public",
+      enum: ['private', 'public'],
+      default: 'public',
     },
     prompt: {
       type: String,
     },
     generationSource: {
       type: String,
-      enum: ["ai", "upload"],
-      default: "ai",
+      enum: ['ai', 'user'],
+      default: 'ai',
     },
-    saved: {
-      type: Boolean,
-      default: false,
-      index: true,
+    format: {
+      type: String,
+      enum: allFormats,
     },
-    active: {
-      type: Boolean,
-      default: true,
-      index: true,
+    version: {
+      type: Number,
+      required: true,
+      default: 1,
+      min: 1,
     },
     width: Number,
     height: Number,
     duration: Number,
+
+    deletedAt: {
+      type: Date,
+    },
   },
+
   { timestamps: true }
 );
 
-export const SceneAssetModel = model<SceneAsset>(
-  "SceneAsset",
-  sceneAssetSchema
+sceneAssetSchema.index({ userId: 1, createdAt: -1 });
+
+//TTL
+sceneAssetSchema.index(
+  { deletedAt: 1 },
+  { expireAfterSeconds: 30 * 24 * 60 * 60, partialFilterExpression: { deletedAt: { $exists: true } } }
 );
+
+export const SceneAssetModel = model<SceneAsset>('SceneAsset', sceneAssetSchema);

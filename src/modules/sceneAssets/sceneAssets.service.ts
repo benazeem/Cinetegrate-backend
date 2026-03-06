@@ -338,14 +338,14 @@ export async function generateVideoAsset(
     // wait and check plan permissions
     await assertFeaturePermission({
       userId: user._id,
-      action: 'VIDEO_GEN',
+      action: 'TXT_TO_VIDEO_GEN',
       grade: grade || 1,
     });
 
     // Deduct credits if applicable
     if (grade && grade > 1) {
-      const creditsUsed = await getCreditCost('VIDEO_GEN', grade);
-      await consumeCredits(user._id, creditsUsed, session);
+      const creditsUsed = await getCreditCost('TXT_TO_VIDEO_GEN', grade);
+      await consumeCredits(userId, creditsUsed, session);
     }
 
     // Placeholder logic for video generation
@@ -369,7 +369,7 @@ export async function generateVideoAsset(
   }
 }
 
-export async function generateImageAsset(userId: string, sceneId: string): Promise<SceneAsset> {
+export async function generateImageAsset(userId: string, sceneId: string) {
   const scene = await validateSceneOwnership(userId, sceneId);
   // Placeholder logic for image generation
 }

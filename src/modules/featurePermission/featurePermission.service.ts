@@ -33,7 +33,7 @@ export async function assertFeaturePermission({ userId, action, grade }: Permiss
   const caps = resolveEffectiveCapabilities(plan.capabilities, overrides);
 
   switch (action) {
-    case 'IMAGE_GEN':
+    case 'TXT_TO_IMAGE_GEN':
       if (!caps.image || grade > caps.image.maxTier) {
         throw new ForbiddenError('Image generation grade not allowed');
       }
@@ -51,7 +51,7 @@ export async function assertFeaturePermission({ userId, action, grade }: Permiss
       }
       return;
 
-    case 'VIDEO_GEN':
+    case 'TXT_TO_VIDEO_GEN':
       if (!caps.video || !caps.video.enabled) {
         throw new ForbiddenError('Video generation not allowed');
       }

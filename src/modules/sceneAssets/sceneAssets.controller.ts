@@ -188,7 +188,7 @@ export const generateVideoAssetController = async (req: Request, res: Response) 
     message: 'Video asset generated successfully',
     data: {
       sceneId,
-      filename: response.videoUrl,
+      filename: response.url,
     },
   });
 };

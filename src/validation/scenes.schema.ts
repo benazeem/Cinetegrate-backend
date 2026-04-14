@@ -72,6 +72,45 @@ export const generateAllScenesSchema = z
   })
   .strict();
 
+export const uploadSceneItemSchema = z
+  .object({
+    title: z
+      .string()
+      .max(MAX_SCENE_TITLE_LENGTH, `Title cannot exceed ${MAX_SCENE_TITLE_LENGTH} characters`)
+      .trim()
+      .optional(),
+    description: z
+      .string()
+      .min(1, 'Description is required')
+      .max(MAX_SCENE_DESCRIPTION_LENGTH, `Description cannot exceed ${MAX_SCENE_DESCRIPTION_LENGTH} characters`)
+      .trim(),
+    imagePrompt: z
+      .string()
+      .min(1, 'Image prompt is required')
+      .max(MAX_SCENE_PROMPT_LENGTH, `Image prompt cannot exceed ${MAX_SCENE_PROMPT_LENGTH} characters`)
+      .trim(),
+    videoPrompt: z
+      .string()
+      .min(1, 'Video prompt is required')
+      .max(MAX_SCENE_PROMPT_LENGTH, `Video prompt cannot exceed ${MAX_SCENE_PROMPT_LENGTH} characters`)
+      .trim(),
+    duration: z
+      .number()
+      .min(MIN_SCENE_DURATION, `Duration must be at least ${MIN_SCENE_DURATION} second`)
+      .max(MAX_SCENE_DURATION, `Duration cannot exceed ${MAX_SCENE_DURATION} seconds`)
+      .optional(),
+  })
+  .strict();
+
+export const uploadScenesJSONSchema = z
+  .object({
+    scenes: z
+      .array(uploadSceneItemSchema)
+      .min(1, 'At least one scene is required')
+      .max(MAX_SCENES_PER_STORY, `Cannot upload more than ${MAX_SCENES_PER_STORY} scenes`),
+  })
+  .strict();
+
 export const updateSceneSchema = z
   .object({
     title: z
@@ -206,6 +245,8 @@ export type SceneAndStoryParam = z.infer<typeof sceneAndStoryParamSchema>;
 
 export type CreateSceneInput = z.infer<typeof createSceneSchema>;
 export type GenerateAllScenesInput = z.infer<typeof generateAllScenesSchema>;
+export type UploadSceneItemInput = z.infer<typeof uploadSceneItemSchema>;
+export type UploadScenesJSONInput = z.infer<typeof uploadScenesJSONSchema>;
 export type UpdateSceneInput = z.infer<typeof updateSceneSchema>;
 export type DurationInput = z.infer<typeof durationSchema>;
 

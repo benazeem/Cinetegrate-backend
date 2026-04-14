@@ -1,6 +1,6 @@
 import { Platform, StoryIntent } from '@constants/storyConsts.js';
 import { ContextProfile } from '@models/ContextProfile.js';
-import { GLOBAL_SAFETY_RULES } from 'libs/ai/constants/globalSafetyRules.js';
+import { GLOBAL_SAFETY_RULES } from '@libs/ai/constants/globalSafetyRules.js';
 import { STORY_GENERATION_FORMAT } from '../constants/storyPromptConts.js';
 import { buildContextSection } from './utils/buildContextSection.js';
 import { calculateWordLimits } from '../constants/calculateWordLimits.js';

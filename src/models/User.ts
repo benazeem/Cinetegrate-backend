@@ -1,4 +1,4 @@
-import { ACCOUNT_STATUSES } from 'constants/authConsts.js';
+import { ACCOUNT_STATUSES } from '@constants/authConsts.js';
 import { Schema, model, type InferSchemaType, type HydratedDocument } from 'mongoose';
 
 const ResetSchema = new Schema(
@@ -48,9 +48,6 @@ const changeMetaSchema = new Schema(
   { _id: false }
 );
 
-/**
- * Subdocument: OAuth / social providers (Google, GitHub, etc.)
- */
 const providerSchema = new Schema(
   {
     provider: {
@@ -77,14 +74,14 @@ const providerSchema = new Schema(
       default: Date.now,
     },
   },
-  { _id: false } // no separate _id needed per provider
+  { _id: false }
 );
 
 const privacyPrefsSchema = new Schema(
   {
     profileVisibility: {
       type: String,
-      enum: ['private', 'public', 'unlisted'],
+      enum: ['private', 'public'],
       default: 'private',
     },
     showEmailOnProfile: {
@@ -92,10 +89,6 @@ const privacyPrefsSchema = new Schema(
       default: false,
     },
     showLinksOnProfile: {
-      type: Boolean,
-      default: true,
-    },
-    allowDiscoverability: {
       type: Boolean,
       default: true,
     },
@@ -119,34 +112,6 @@ const notificationPrefsSchema = new Schema(
     marketingEmails: {
       type: Boolean,
       default: false,
-    },
-  },
-  { _id: false }
-);
-
-/**
- * Subdocument: usage / quotas
- */
-const usageSchema = new Schema(
-  {
-    imagesGenerated: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
-    secondsRendered: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
-    apiCalls: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
-    lastResetAt: {
-      type: Date,
-      default: Date.now,
     },
   },
   { _id: false }
@@ -220,13 +185,9 @@ const userSchema = new Schema(
     },
 
     planEndsAt: {
-      type: Date,  
+      type: Date,
     },
 
-    usage: {
-      type: usageSchema,
-      default: () => ({}),
-    }, 
     passwordHash: {
       type: String,
       required: true,

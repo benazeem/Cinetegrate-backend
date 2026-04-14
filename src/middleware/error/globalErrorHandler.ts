@@ -21,7 +21,6 @@ const errorHandler = (err: unknown, req: Request, res: Response, _next: NextFunc
     return res.status(err.statusCode).json(err.serialize());
   }
 
-  console.log(err);
   logger.error({
     requestId,
     name: 'UnhandledError',
@@ -33,8 +32,10 @@ const errorHandler = (err: unknown, req: Request, res: Response, _next: NextFunc
   });
 
   return res.status(500).json({
-    status: 'error',
     message: 'Internal Server Error',
+    data: {
+      code: 'internal_error',
+    },
   });
 };
 

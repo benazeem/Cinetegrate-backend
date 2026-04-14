@@ -8,7 +8,7 @@ import safeParseJSON from '@utils/safeParseJSON.js';
 import { buildStoryNarrationPrompt } from '@libs/ai/prompts/narrationPrompt.js';
 import { openRouterAI } from '@libs/ai/clients/openAI.js';
 import { BadRequestError, ConflictError, NotFoundError } from '@middleware/error/index.js';
-import { Pagination, Sorting } from 'types/Pagination.js';
+import type { Pagination, Sorting } from '@app-types/Pagination.js';
 import { withTransaction } from '@db/withTransaction.js';
 import { validateNarrationOwnership } from 'validators/validateNarrationOwnership.js';
 import { assertHasActiveScenes } from 'domain/assertions/assertSceneState.js';
@@ -23,35 +23,18 @@ import { assertNarrationFitsTime } from 'domain/assertions/assertNarrationFitsTi
 import { hashSceneOrder } from '@utils/hashSceneOrder.js';
 import { assertCharacterFits } from 'domain/assertions/assertCharacterFits.js';
 import { Types } from 'mongoose';
+import { sanitizeNarrationsResponse } from '@utils/sanitizers/sanitizeNarrationResponse.js';
 
-export async function getAllNarrationsForStory(
-  userId: string,
-  storyId: string,
-  pagination: Pagination,
-  sorting: Sorting
-) {
-  const { page, limit, skip } = pagination;
+export async function getAllNarrationsForStory(userId: string, storyId: string) {
+  const narrations = await StoryNarrationModel.find({
+    userId,
+    storyId,
+    deletedAt: { $exists: false },
+  })
+    .sort({ version: -1 })
+    .populate('activeAudioAssetId');
 
-  const sortOptions: Record<string, 1 | -1> = {};
-  sortOptions[sorting.sortBy || 'version'] = sorting.sortOrder || -1;
-
-  const [narrations, total] = await Promise.all([
-    StoryNarrationModel.find({
-      userId,
-      storyId,
-      deletedAt: { $exists: false },
-    })
-      .sort(sortOptions)
-      .skip(skip)
-      .limit(limit),
-    StoryNarrationModel.countDocuments({
-      userId,
-      storyId,
-      deletedAt: { $exists: false },
-    }),
-  ]);
-
-  return [narrations, total];
+  return sanitizeNarrationsResponse(narrations);
 }
 
 export async function getAllDeletedNarrations(
@@ -91,8 +74,11 @@ export async function getAllNarrationForSceneOrder(userId: string, storyId: stri
     storyId,
     sceneOrderHash,
     deletedAt: { $exists: false },
-  });
-  return narration;
+  }).populate('activeAudioAssetId');
+
+  const sanitizedResponse = sanitizeNarrationsResponse([narration as StoryNarration]);
+
+  return sanitizedResponse;
 }
 
 // For single narration
@@ -102,13 +88,16 @@ export async function getActiveNarration(userId: string, storyId: string) {
     storyId,
     active: true,
     deletedAt: { $exists: false },
-  });
+  }).populate('activeAudioAssetId');
 
   return narration;
 }
 
 export async function getNarrationById(userId: string, narrationId: string) {
-  const narration = await validateNarrationOwnership(userId, narrationId);
+  const narration = await StoryNarrationModel.findOne({
+    _id: narrationId,
+    userId,
+  }).populate('activeAudioAssetId');
   return narration;
 }
 

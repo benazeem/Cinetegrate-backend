@@ -3,7 +3,7 @@ import { SceneAssetModel, SceneAsset } from '@models/SceneAssets.js';
 import { SceneModel } from '@models/Scene.js';
 import { NotFoundError, BadRequestError, ConflictError } from '@middleware/error/index.js';
 import mongoose, { ClientSession } from 'mongoose';
-import type { Pagination, Sorting } from 'types/Pagination.js';
+import type { Pagination, Sorting } from '@app-types/Pagination.js';
 import { getVideoDuration } from '@utils/getVideoDuration.js';
 import { assertFeaturePermission } from '@modules/featurePermission/featurePermission.service.js';
 import { getCreditCost } from '@utils/getCreditCost.js';
@@ -18,6 +18,8 @@ import {
   assertHasNonDeletedAssets,
 } from 'domain/assertions/assertAssetState.js';
 import { withTransaction } from '@db/withTransaction.js';
+import { removeTempFile } from '@utils/file.js';
+import { uploadFile } from '@libs/aws/s3.js';
 
 // Get the next version number for an asset in a scene
 async function getNextVersionNumber(sceneId: string, session?: ClientSession): Promise<number> {
@@ -371,7 +373,31 @@ export async function generateVideoAsset(
 
 export async function generateImageAsset(userId: string, sceneId: string) {
   const scene = await validateSceneOwnership(userId, sceneId);
-  // Placeholder logic for image generation
+  const user = await validateUser(userId);
+
+  // if (user.planEndsAt && user.planEndsAt <= new Date()) {
+  //   throw new BadRequestError('Plan has expired. Please renew to generate new assets.');
+  // }
+  const generatedImageUrl = `https://media.istockphoto.com/id/1363689354/photo/aerial-view-on-green-pine-forest.webp?s=1024x1024&w=is&k=20&c=PSCjwZKiHtwE3YroyuUosYDT3eVNjjd5G9_8s5LkuBs=`;
+  const asset = new SceneAssetModel({
+    userId: user._id,
+    sceneId,
+    type: 'image',
+    url: generatedImageUrl,
+    visibility: 'public',
+    generationSource: 'ai',
+    status: 'ready',
+    version: await getNextVersionNumber(sceneId),
+  });
+  await asset.save();
+
+  scene.activeAssetId = asset._id;
+  scene.status = 'ready';
+  await scene.save();
+
+  await new Promise((resolve) => setTimeout(resolve, 5000));
+
+  return asset;
 }
 
 export async function uploadVideoAsset(
@@ -385,34 +411,38 @@ export async function uploadVideoAsset(
   try {
     duration = await getVideoDuration(file.path);
   } catch {
-    await fs.unlink(file.path);
+    await removeTempFile(file.path);
     throw new BadRequestError('Invalid or corrupted video file');
   }
 
-  console.log('Video duration:', duration, 'Scene duration:', scene.duration);
-  console.log('Difference:', Math.abs(duration - (scene.duration || 0)));
-
-  if (scene.duration !== undefined && Math.abs(duration - scene.duration) > 0.25) {
-    await fs.unlink(file.path);
+  if (scene.duration !== undefined && Math.abs(duration - scene.duration) < 0.25) {
+    await removeTempFile(file.path);
     throw new BadRequestError('Video duration does not match existing scene duration and cannot be uploaded');
   }
-  // TODO: Add video to cloud storage here and get the URL
-  const videoUrl = `/uploads/videos/${file.filename}`;
-  const asset = new SceneAssetModel({
+
+  const fileBuffer = await fs.readFile(file.path);
+  const key = `uploads/videos/${userId}/${Date.now()}.${file.originalname.split('.').pop()}`;
+  const url = await uploadFile({
+    buffer: fileBuffer,
+    key,
+    contentType: file.mimetype,
+  });
+  await removeTempFile(file.path);
+
+  const asset = await SceneAssetModel.create({
     userId,
     sceneId,
     type: 'video',
-    url: videoUrl,
-    visibility: 'public',
+    url,
+    visibility: 'private',
     format: file.mimetype.split('/')[1] || undefined,
     version: await getNextVersionNumber(sceneId),
     duration,
   });
   await asset.save();
-
-  await fs.unlink(file.path);
-
-  return { asset, videoUrl };
+  scene.activeAssetId = asset._id;
+  await scene.save();
+  return { asset, videoUrl: url };
 }
 
 export async function uploadImageAsset(
@@ -420,22 +450,29 @@ export async function uploadImageAsset(
   sceneId: string,
   file: Express.Multer.File
 ): Promise<SceneAsset> {
-  await validateSceneOwnership(userId, sceneId);
-  //TODO: Add Image to cloud storage and get URL
-  const imageUrl = `/uploads/images/${file.filename}`;
-  const asset = new SceneAssetModel({
+  const scene = await validateSceneOwnership(userId, sceneId);
+
+  const { buffer, mimetype } = file;
+  const key = `uploads/images/${userId}/${Date.now()}.webp`;
+
+  const assetUrl = await uploadFile({
+    buffer,
+    key,
+    contentType: mimetype,
+  });
+
+  const asset = await SceneAssetModel.create({
     userId,
     sceneId,
     type: 'image',
-    url: imageUrl,
-    visibility: 'public',
+    url: assetUrl,
+    visibility: 'private',
     format: file.mimetype.split('/')[1] || undefined,
     version: await getNextVersionNumber(sceneId),
   });
   await asset.save();
-
-  await fs.unlink(file.path);
-
+  scene.activeAssetId = asset._id;
+  await scene.save();
   return asset;
 }
 

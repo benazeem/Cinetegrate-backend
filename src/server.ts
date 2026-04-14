@@ -15,8 +15,7 @@ app.use(
 app.use(AppRouter);
 
 const startServer = async () => {
-  try {
-    // Wait for DB first
+  try { 
     await connectDB();  
     app.listen(process.env.PORT, () => {
       console.log(`🚀 Server running on port ${process.env.PORT}`);
@@ -25,7 +24,7 @@ const startServer = async () => {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error("❌ Failed to start server:", message);
-    process.exit(1); // stop app
+    process.exit(1);  
   }
 };
 

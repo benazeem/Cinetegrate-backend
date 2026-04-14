@@ -3,6 +3,7 @@ import {
   archiveAllProjectsController,
   archiveManyProjectsController,
   createProjectContextProfileController,
+  updateProjectContextProfileController,
   deleteAllProjectsController,
   deleteManyProjectsController,
   deleteProjectByIdController,
@@ -32,6 +33,7 @@ import {
   createProjectSchema,
   projectIdParamSchema,
   updateManyIdsSchema,
+  updateProjectContextProfileSchema,
   updateProjectSchema,
   updateProjectStatusSchema,
   updateProjectVisibilitySchema,
@@ -80,6 +82,12 @@ router.post(
   validateParams(projectIdParamSchema),
   validateBody(createProjectContextProfileSchema),
   asyncHandler(createProjectContextProfileController)
+);
+router.patch(
+  '/:projectId/context-profile',
+  validateParams(projectIdParamSchema),
+  validateBody(updateProjectContextProfileSchema),
+  asyncHandler(updateProjectContextProfileController)
 );
 router.patch(
   '/:projectId',

@@ -83,7 +83,7 @@ router.post(
   '/:sceneId/permanent-bulk-delete',
   validateParams(sceneIdParamSchema),
   validateBody(bulkDeleteAssetsSchema),
-  asyncHandler(permanentDeleteAllAssetsController)
+  asyncHandler(permanentBulkDeleteAssetsController)
 );
 
 router.post(

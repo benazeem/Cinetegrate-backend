@@ -1,14 +1,11 @@
+export { type ProjectStatus, type TransitionableManyProjectStatus } from '@app-types/Project.js';
+import type { ProjectStatus } from '@app-types/Project.js';
+
 export const ACTIVE_STATUSES: ['active', 'draft'] = ['active', 'draft'];
 export const NON_DELETED_STATUSES: ['active', 'draft', 'archive'] = ['active', 'draft', 'archive'];
 
-export type ProjectStatus = 'draft' | 'active' | 'archive' | 'delete';
-export type TransitionableManyProjectStatus = ProjectStatus[];
-
-export function canTransition(
-  from: 'draft' | 'active' | 'archive' | 'delete',
-  to: 'draft' | 'active' | 'archive' | 'delete'
-) {
-  const allowed = {
+export function canTransition(from: ProjectStatus, to: ProjectStatus) {
+  const allowed: Record<ProjectStatus, ProjectStatus[]> = {
     draft: ['active', 'delete'],
     active: ['archive', 'delete'],
     archive: ['active', 'delete'],

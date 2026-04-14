@@ -24,42 +24,42 @@ export class AppError extends Error {
     this.name = this.constructor.name;
     this.statusCode = statusCode;
     this.code = code;
-    this.actions = actions; // optional now
+    this.actions = actions;
     this.isOperational = true;
     this.details = details;
 
-    // Dev mode: include stack trace
-    if (process.env.NODE_ENV === "development") {
+    if (process.env.NODE_ENV === 'development') {
       Error.captureStackTrace(this, this.constructor);
       this.stackTrace = this.stack;
     }
 
-    // Production mode: hide stack trace
-    if (process.env.NODE_ENV === "production") {
+    if (process.env.NODE_ENV === 'production') {
       this.stack = undefined;
       this.details = undefined;
     }
   }
 
+  /**
+   * Serialises the error into the standard API envelope:
+   * { message: string, data: { code, actions?, details?, stack? } }
+   */
   serialize() {
-    const base: any = {
-      error: this.code,
-      message: this.message,
+    const errorPayload: Record<string, unknown> = {
+      code: this.code,
     };
 
-    // Only include actions if they exist
     if (this.actions) {
-      base.actions = this.actions;
+      errorPayload.actions = this.actions;
     }
 
-    if (process.env.NODE_ENV === "development") {
-      return {
-        ...base,
-        details: this.details,
-        stack: this.stackTrace,
-      };
+    if (process.env.NODE_ENV === 'development') {
+      errorPayload.details = this.details;
+      errorPayload.stack = this.stackTrace;
     }
 
-    return base;
+    return {
+      message: this.message,
+      data: errorPayload,
+    };
   }
 }

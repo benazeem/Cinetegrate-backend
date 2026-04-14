@@ -23,13 +23,13 @@ import {
 import type {
   GenerateAudioAssetInput,
   RegenerateAudioAssetInput,
-  UploadAudioAssetInput,
   SetActiveAudioAssetInput,
-  UpdateAudioAssetInput,
   BulkDeleteAudioAssetsInput,
   BulkRestoreAudioAssetsInput,
 } from '@validation/audio.schema.js';
 import { paginationResponse } from '@utils/paginationResponse.js';
+import { sendSuccess, sendPaginated } from '@shared/response.js';
+import { BadRequestError } from '@middleware/error/index.js';
 
 // ==================== ALL OPERATIONS ====================
 
@@ -38,16 +38,13 @@ export const getAllAudioAssetsController = async (req: Request, res: Response) =
   const { narrationId } = req.params;
   const pagination = req?.pagination!;
   const sorting = req?.sorting!;
-
   const [audioAssets, total] = await getAllAudioAssetsForNarration(userId, narrationId, pagination, sorting);
-
-  const paginationRes = paginationResponse(pagination, total as number);
-
-  res.status(200).json({
-    message: 'Audio assets retrieved successfully',
-    data: audioAssets,
-    pagination: paginationRes,
-  });
+  return sendPaginated(
+    res,
+    audioAssets as any[],
+    paginationResponse(pagination, total as number),
+    'Audio assets retrieved successfully'
+  );
 };
 
 export const getAllDeletedAudioAssetsController = async (req: Request, res: Response) => {
@@ -55,64 +52,53 @@ export const getAllDeletedAudioAssetsController = async (req: Request, res: Resp
   const { narrationId } = req.params;
   const pagination = req?.pagination!;
   const sorting = req?.sorting!;
-
   const [audioAssets, total] = await getAllDeletedAudioAssets(userId, narrationId, pagination, sorting);
-
-  const paginationRes = paginationResponse(pagination, total as number);
-
-  res.status(200).json({
-    message: 'Deleted audio assets retrieved successfully',
-    data: audioAssets,
-    pagination: paginationRes,
-  });
+  return sendPaginated(
+    res,
+    audioAssets as any[],
+    paginationResponse(pagination, total as number),
+    'Deleted audio assets retrieved successfully'
+  );
 };
 
 export const restoreAllDeletedAudioAssetsController = async (req: Request, res: Response) => {
   const userId = req.user!.id;
   const { narrationId } = req.params;
-
   const result = await restoreAllDeletedAudioAssets(userId, narrationId);
-
-  res.status(200).json({
-    message: 'All deleted audio assets restored successfully',
-    restoredCount: result.restoredCount,
-  });
+  return sendSuccess(
+    res,
+    { restoredCount: result.restoredCount },
+    'All deleted audio assets restored successfully'
+  );
 };
 
 export const softDeleteAllAudioAssetsController = async (req: Request, res: Response) => {
   const userId = req.user!.id;
   const { narrationId } = req.params;
-
   const result = await softDeleteAllAudioAssetsForNarration(userId, narrationId);
-
-  res.status(200).json({
-    message: 'All audio assets soft deleted successfully',
-    deletedCount: result.deletedCount,
-  });
+  return sendSuccess(
+    res,
+    { deletedCount: result.deletedCount },
+    'All audio assets soft deleted successfully'
+  );
 };
 
 export const permanentDeleteAllAudioAssetsController = async (req: Request, res: Response) => {
   const userId = req.user!.id;
   const { narrationId } = req.params;
-
   const result = await permanentDeleteAllAudioAssetsForNarration(userId, narrationId);
-
-  res.status(200).json({
-    message: 'All audio assets permanently deleted successfully',
-    deletedCount: result.deletedCount,
-  });
+  return sendSuccess(
+    res,
+    { deletedCount: result.deletedCount },
+    'All audio assets permanently deleted successfully'
+  );
 };
 
 export const getAudioAssetCountController = async (req: Request, res: Response) => {
   const userId = req.user!.id;
   const { narrationId } = req.params;
-
   const count = await getAudioAssetCount(userId, narrationId);
-
-  res.status(200).json({
-    message: 'Audio asset count retrieved successfully',
-    count,
-  });
+  return sendSuccess(res, { count }, 'Audio asset count retrieved successfully');
 };
 
 // ==================== BULK OPERATIONS ====================
@@ -121,39 +107,28 @@ export const softBulkDeleteAudioAssetsController = async (req: Request, res: Res
   const userId = req.user!.id;
   const { narrationId } = req.params;
   const { audioAssetIds } = req.validatedBody as BulkDeleteAudioAssetsInput;
-
   const result = await softBulkDeleteAudioAssets(userId, narrationId, audioAssetIds);
-
-  res.status(200).json({
-    message: 'Audio assets soft deleted successfully',
-    deletedCount: result.deletedCount,
-  });
+  return sendSuccess(res, { deletedCount: result.deletedCount }, 'Audio assets soft deleted successfully');
 };
 
 export const permanentBulkDeleteAudioAssetsController = async (req: Request, res: Response) => {
   const userId = req.user!.id;
   const { narrationId } = req.params;
   const { audioAssetIds } = req.validatedBody as BulkDeleteAudioAssetsInput;
-
   const result = await permanentBulkDeleteAudioAssets(userId, narrationId, audioAssetIds);
-
-  res.status(200).json({
-    message: 'Audio assets permanently deleted successfully',
-    deletedCount: result.deletedCount,
-  });
+  return sendSuccess(
+    res,
+    { deletedCount: result.deletedCount },
+    'Audio assets permanently deleted successfully'
+  );
 };
 
 export const bulkRestoreAudioAssetsController = async (req: Request, res: Response) => {
   const userId = req.user!.id;
   const { narrationId } = req.params;
   const { audioAssetIds } = req.validatedBody as BulkRestoreAudioAssetsInput;
-
   const result = await bulkRestoreAudioAssets(userId, narrationId, audioAssetIds);
-
-  res.status(200).json({
-    message: 'Audio assets restored successfully',
-    data: result,
-  });
+  return sendSuccess(res, result, 'Audio assets restored successfully');
 };
 
 // ==================== SINGLE OPERATIONS ====================
@@ -161,58 +136,37 @@ export const bulkRestoreAudioAssetsController = async (req: Request, res: Respon
 export const getAudioAssetByIdController = async (req: Request, res: Response) => {
   const userId = req.user!.id;
   const { audioAssetId } = req.params;
-
   const audioAsset = await getAudioAssetById(userId, audioAssetId);
-
-  res.status(200).json({
-    message: 'Audio asset retrieved successfully',
-    data: audioAsset,
-  });
+  return sendSuccess(res, audioAsset, 'Audio asset retrieved successfully');
 };
 
 export const getActiveAudioAssetController = async (req: Request, res: Response) => {
   const userId = req.user!.id;
   const { narrationId } = req.params;
-
   const audioAsset = await getActiveAudioAssetForNarration(userId, narrationId);
-
-  if (!audioAsset) {
-    return res.status(200).json({
-      message: 'No active audio asset found for this narration',
-      data: null,
-    });
-  }
-
-  res.status(200).json({
-    message: 'Active audio asset retrieved successfully',
-    data: audioAsset,
-  });
+  return sendSuccess(
+    res,
+    audioAsset ?? null,
+    audioAsset
+      ? 'Active audio asset retrieved successfully'
+      : 'No active audio asset found for this narration'
+  );
 };
 
 export const generateAudioAssetController = async (req: Request, res: Response) => {
   const userId = req.user!.id;
   const { narrationId } = req.params;
   const { voiceId, prompt } = req.validatedBody as GenerateAudioAssetInput;
-
   const audioAsset = await generateAudioAsset(userId, narrationId, voiceId, prompt);
-
-  res.status(201).json({
-    message: 'Audio asset generated successfully',
-    data: audioAsset,
-  });
+  return sendSuccess(res, audioAsset, 'Audio asset generated successfully', 201);
 };
 
 export const regenerateAudioAssetController = async (req: Request, res: Response) => {
   const userId = req.user!.id;
   const { audioAssetId } = req.params;
   const { voiceId, extraPrompt } = req.validatedBody as RegenerateAudioAssetInput;
-
   const audioAsset = await regenerateAudioAsset(userId, audioAssetId, voiceId, extraPrompt);
-
-  res.status(201).json({
-    message: 'Audio asset regenerated successfully',
-    data: audioAsset,
-  });
+  return sendSuccess(res, audioAsset, 'Audio asset regenerated successfully', 201);
 };
 
 export const uploadAudioAssetController = async (req: Request, res: Response) => {
@@ -220,73 +174,45 @@ export const uploadAudioAssetController = async (req: Request, res: Response) =>
   const { narrationId } = req.params;
 
   if (!req.file) {
-    return res.status(400).json({
-      message: 'No file uploaded',
-    });
+    throw new BadRequestError('No file uploaded');
   }
 
   const audioAsset = await uploadNarrationAudioAsset(userId, narrationId, req.file.path);
-
-  res.status(201).json({
-    message: 'Audio asset uploaded successfully',
-    data: audioAsset,
-  });
+  return sendSuccess(res, audioAsset, 'Audio asset uploaded successfully', 201);
 };
 
 export const setActiveAudioAssetController = async (req: Request, res: Response) => {
   const userId = req.user!.id;
   const { narrationId } = req.params;
   const { audioAssetId } = req.validatedBody as SetActiveAudioAssetInput;
-
   const audioAsset = await setActiveAudioAsset(userId, narrationId, audioAssetId);
-
-  res.status(200).json({
-    message: 'Audio asset set as active successfully',
-    data: audioAsset,
-  });
+  return sendSuccess(res, audioAsset, 'Audio asset set as active successfully');
 };
 
 export const softDeleteAudioAssetController = async (req: Request, res: Response) => {
   const userId = req.user!.id;
   const { audioAssetId } = req.params;
-
   await softDeleteAudioAsset(userId, audioAssetId);
-
-  res.status(200).json({
-    message: 'Audio asset soft deleted successfully',
-  });
+  return sendSuccess(res, null, 'Audio asset soft deleted successfully');
 };
 
 export const permanentDeleteAudioAssetController = async (req: Request, res: Response) => {
   const userId = req.user!.id;
   const { audioAssetId } = req.params;
-
   await permanentDeleteAudioAsset(userId, audioAssetId);
-
-  res.status(200).json({
-    message: 'Audio asset permanently deleted successfully',
-  });
+  return sendSuccess(res, null, 'Audio asset permanently deleted successfully');
 };
 
 export const forceDeleteActiveAudioAssetController = async (req: Request, res: Response) => {
   const userId = req.user!.id;
   const { audioAssetId } = req.params;
-
   await forceDeleteActiveAudioAsset(userId, audioAssetId);
-
-  res.status(200).json({
-    message: 'Active audio asset force deleted successfully',
-  });
+  return sendSuccess(res, null, 'Active audio asset force deleted successfully');
 };
 
 export const restoreAudioAssetController = async (req: Request, res: Response) => {
   const userId = req.user!.id;
   const { narrationId, audioAssetId } = req.params;
-
   const audioAsset = await restoreAudioAsset(userId, narrationId, audioAssetId);
-
-  res.status(200).json({
-    message: 'Audio asset restored successfully',
-    data: audioAsset,
-  });
+  return sendSuccess(res, audioAsset, 'Audio asset restored successfully');
 };

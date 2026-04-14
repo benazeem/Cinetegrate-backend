@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
-import { RESET_EXP_MIN } from 'constants/authConsts.js';
+import { RESET_EXP_MIN } from '@constants/authConsts.js';
 import { UserModel, type User } from '@models/User.js';
 import { SessionModel, type Session } from '@models/Session.js';
 import {
@@ -30,27 +30,19 @@ import { createSessionPayload } from './utils/createSessionPayload.js';
 import { assignFreePlan } from '@modules/subscription/subscription.service.js';
 import { withTransaction } from '@db/withTransaction.js';
 
+import type { SignOutput, RefreshTokenOutput } from '@app-types/Auth.js';
+
+// ─── Internal input types ──────────────────────────────────────────────────────────
+
 type LoginInputWithMeta = LoginInput & {
   userAgent: string;
   ip: string | string[] | undefined;
 };
-type SignOutput = {
-  user: User;
-  tokens: {
-    accessToken: string;
-    refreshToken: string;
-    csrfToken: string;
-  };
-};
+
 type RegisterInputWithMeta = RegisterInput & {
   userAgent: string;
   ip: string | string[] | undefined;
 };
-interface RefreshTokenOutput {
-  accessToken: string;
-  refreshToken: string;
-  csrfToken: string;
-}
 
 export async function registerUser(input: RegisterInputWithMeta): Promise<SignOutput> {
   const { email, password, name, username, userAgent, ip } = input;
@@ -97,7 +89,16 @@ export async function registerUser(input: RegisterInputWithMeta): Promise<SignOu
       { session }
     );
     sendWelcomeEmail(user.email, user.displayName, user.username);
-    return { user, tokens };
+    return {
+      user: {
+        email: user.email,
+        username: user.username,
+        displayName: user.displayName ?? null,
+        avatarUrl: user.avatarUrl ?? null,
+        accountStatus: user.accountStatus,
+      },
+      tokens,
+    };
   });
 }
 
@@ -140,7 +141,16 @@ export async function loginUser(input: LoginInputWithMeta): Promise<SignOutput> 
       ],
       { session }
     );
-    return { user, tokens };
+    return {
+      user: {
+        email: user.email,
+        username: user.username,
+        displayName: user.displayName ?? null,
+        avatarUrl: user.avatarUrl ?? null,
+        accountStatus: user.accountStatus,
+      },
+      tokens,
+    };
   });
 }
 

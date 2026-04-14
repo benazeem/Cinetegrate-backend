@@ -1,7 +1,7 @@
 import { InternalServerError } from '@middleware/error/index.js';
 import ffmpeg from 'fluent-ffmpeg';
 
-export function getVideoDuration(filePath: string): Promise<number> {
+export function   getVideoDuration(filePath: string): Promise<number> {
   return new Promise((resolve, reject) => {
     ffmpeg.ffprobe(filePath, (err, metadata) => {
       if (err) {

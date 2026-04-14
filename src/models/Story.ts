@@ -14,8 +14,8 @@ export interface Story extends Document {
     keywords?: string[];
     tags?: string[];
     authorType: 'ai' | 'user';
+    contentStatus: 'not-generated' | 'generating' | 'ready' | 'error';
   };
-
   status: 'active' | 'delete' | 'archive' | 'draft';
   deletedAt: Date;
   version: number;
@@ -74,15 +74,19 @@ const storySchema = new Schema<Story>(
         enum: ['ai', 'user'],
         default: 'ai',
       },
+      contentStatus: {
+        type: String,
+        enum: ['not-generated', 'generating', 'ready', 'error'],
+        default: 'not-generated',
+      },
     },
-
     status: {
       type: String,
       enum: ['active', 'archive', 'delete', 'draft'],
       default: 'active',
     },
     deletedAt: {
-      type: Date, 
+      type: Date,
     },
     version: {
       type: Number,

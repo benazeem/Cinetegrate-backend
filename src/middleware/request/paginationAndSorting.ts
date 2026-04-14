@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { BadRequestError } from '../error/index.js';
-import type { Pagination, Sorting } from 'types/Pagination.js';
+import type { Pagination, Sorting } from '@app-types/Pagination.js';
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_LIMIT = 10;

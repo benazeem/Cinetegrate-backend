@@ -1,50 +1,45 @@
-import mongoose from 'mongoose';
 import { BadRequestError, NotFoundError } from '@middleware/error/index.js';
 import { ContextProfileModel, ContextScope, GenreType } from '@models/ContextProfile.js';
 import { ProjectModel } from '@models/Project.js';
-import { NARRATION_PROFILES } from 'constants/narrationProfiles.js';
+import { NARRATION_PROFILES } from '@constants/narrationProfiles.js';
 import type { CreateContextProfileInput } from '@validation/contextProfile.schema.js';
+import { withTransaction } from '@db/withTransaction.js';
+import {
+  sanitizeContextProfileResponse,
+  sanitizeContextProfilesResponse,
+} from '@utils/sanitizers/sanitizeContextProfileResponse.js';
 
 export async function getContextProfileService(userId: string, contextId: string) {
-  const context = await ContextProfileModel.findOne({
-    _id: contextId,
-    userId,
-  });
-
+  const context = await ContextProfileModel.findOne({ _id: contextId, userId });
   if (!context) throw new NotFoundError('Context not found');
-  return context;
+  return sanitizeContextProfileResponse(context);
 }
 
 export async function listContextProfilesService(userId: string, query: any) {
   const filter: any = { userId };
-
   if (query.scope) filter.scope = query.scope;
   if (query.projectId) filter.projectId = query.projectId;
 
-  return ContextProfileModel.find(filter).sort({ updatedAt: -1 });
+  const contexts = await ContextProfileModel.find(filter).sort({ updatedAt: -1 });
+  return sanitizeContextProfilesResponse(contexts);
 }
 
 export async function createContextProfileService(userId: string, payload: CreateContextProfileInput) {
-  const session = await mongoose.startSession();
-  session.startTransaction();
+  const makeGlobal = payload.makeGlobal === true;
 
-  try {
-    const makeGlobal = payload.makeGlobal === true;
+  if (!makeGlobal && !payload.projectId) {
+    throw new BadRequestError('projectId is required when creating a non-global context');
+  }
 
-    if (!makeGlobal && !payload.projectId) {
-      throw new BadRequestError('projectId is required when creating a non-global context');
-    }
+  if (makeGlobal && payload.setAsProjectDefault) {
+    throw new BadRequestError('Global context cannot be set as project default');
+  }
 
-    if (makeGlobal && payload.setAsProjectDefault) {
-      throw new BadRequestError('Global context cannot be set as project default');
-    }
-
+  return withTransaction(async (session) => {
     let project = null;
     if (!makeGlobal && payload.projectId) {
       project = await ProjectModel.findOne({ _id: payload.projectId, userId }).session(session);
-      if (!project) {
-        throw new NotFoundError('Project not found');
-      }
+      if (!project) throw new NotFoundError('Project not found');
     }
 
     const narrationProfile = NARRATION_PROFILES[payload.genre as GenreType];
@@ -75,12 +70,7 @@ export async function createContextProfileService(userId: string, payload: Creat
 
     if (!makeGlobal && payload.setAsProjectDefault && project) {
       await ContextProfileModel.updateMany(
-        {
-          userId,
-          projectId: project._id,
-          _id: { $ne: context._id },
-          isDefaultForProject: true,
-        },
+        { userId, projectId: project._id, _id: { $ne: context._id }, isDefaultForProject: true },
         { $set: { isDefaultForProject: false } }
       ).session(session);
 
@@ -91,12 +81,6 @@ export async function createContextProfileService(userId: string, payload: Creat
       await project.save({ session });
     }
 
-    await session.commitTransaction();
-    return context;
-  } catch (err) {
-    await session.abortTransaction();
-    throw err;
-  } finally {
-    session.endSession();
-  }
+    return sanitizeContextProfileResponse(context);
+  });
 }

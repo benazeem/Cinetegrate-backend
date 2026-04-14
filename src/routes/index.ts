@@ -23,10 +23,14 @@ AppRouter.use((_req, res, next) => {
   res.setHeader('X-Debug-Server', process.pid.toString());
   next();
 });
+AppRouter.use((_req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store');
+  next();
+});
 
 // Health route
 AppRouter.get('/health', (_req: Request, res: Response) => {
-  res.status(200).json({ status: 'ok' });
+  res.status(200).json({ message: 'Server is healthy', data: { status: 'ok' } });
 });
 
 AppRouter.use('/api', apiRouter);

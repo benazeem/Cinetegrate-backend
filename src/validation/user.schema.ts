@@ -5,21 +5,33 @@ import { z } from "zod";
    Body Schemas
    -------------------------*/
 
+const urlField = z
+  .string()
+  .refine((val) => {
+    try {
+      const url = new URL(val);
+      return url.protocol === "http:" || url.protocol === "https:";
+    } catch {
+      return false;
+    }
+  }, { message: "Invalid URL" })
+  .optional();
+
 export const updateProfileSchema = z.object({
   displayName: z.string().trim().min(1).max(80).optional(),
   bio: z.string().max(160).optional(),
-  links: z
-    .object({
-      website: z.string().url().optional(),
-      youtube: z.string().url().optional(),
-      twitter: z.string().url().optional(),
-      instagram: z.string().url().optional(),
-      linkedin: z.string().url().optional(),
-      facebook: z.string().url().optional(),
-      github: z.string().url().optional(),
-    })
-    .strict()
-    .optional(),
+
+  links: z.object({
+    website: urlField,
+    youtube: urlField,
+    twitter: urlField,
+    instagram: urlField,
+    linkedin: urlField,
+    facebook: urlField,
+    github: urlField,
+  })
+  .strict()
+  .optional(),
 });
 
 export const updateAvatarSchema = z

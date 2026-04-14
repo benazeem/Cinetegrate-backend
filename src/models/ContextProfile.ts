@@ -136,6 +136,7 @@ export interface ContextProfile extends Document {
   userId: Types.ObjectId;
 
   projectId?: Types.ObjectId;
+  storyId?: Types.ObjectId;
   scope: ContextScope;
   isDefaultForProject: boolean;
   parentContextId?: Types.ObjectId;
@@ -195,6 +196,11 @@ const contextProfileSchema = new Schema<ContextProfile>(
       type: Boolean,
       default: false,
     },
+    storyId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Story',
+    },
+
     parentContextId: {
       type: Schema.Types.ObjectId,
       ref: 'ContextProfile',
@@ -332,6 +338,7 @@ const contextProfileSchema = new Schema<ContextProfile>(
 );
 
 contextProfileSchema.index({ projectId: 1, isDefaultForProject: 1 });
+contextProfileSchema.index({ storyId: 1 });
 contextProfileSchema.index({ parentContextId: 1 });
 contextProfileSchema.index({ userId: 1, lastUsedAt: -1 });
 

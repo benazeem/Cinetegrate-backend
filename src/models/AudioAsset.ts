@@ -8,6 +8,7 @@ export interface AudioAsset extends Document {
   url: string;
   prompt?: string;
   generationSource: 'ai' | 'user';
+  status: 'not-generated' | 'generating' | 'ready' | 'error';
   voiceId?: string;
   duration?: number;
   version?: number;

@@ -8,14 +8,15 @@ import { default as contextProfileRouter } from '@modules/contextProfile/context
 import { default as scenesRouter } from '@modules/scenes/scenes.private.routes.js';
 import { default as narrationRouter } from '@modules/narration/narration.routes.js';
 import { default as sceneAssetsRouter } from '@modules/sceneAssets/sceneAssets.private.routes.js';
+import { default as audioRouter } from '@modules/audio/audio.routes.js';
 
 import { csrfMiddleware } from '@middleware/security/requireCsrf.js';
 import { requireActiveAccount } from '@middleware/security/requireActiveAccount.js';
 
 const apiRouter = Router();
 
-// private routes
 apiRouter.use('/auth', authRouter);
+// private routes
 apiRouter.use(authMiddleware, csrfMiddleware);
 apiRouter.use('/user', userRouter);
 apiRouter.use(requireActiveAccount);
@@ -25,5 +26,6 @@ apiRouter.use('/context-profiles', contextProfileRouter);
 apiRouter.use('/scenes', scenesRouter);
 apiRouter.use('/assets', sceneAssetsRouter);
 apiRouter.use('/narrations', narrationRouter);
+apiRouter.use('/audio', audioRouter);
 
 export default apiRouter;

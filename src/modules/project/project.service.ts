@@ -7,17 +7,19 @@ import {
 import type {
   CreateProjectContextInput,
   CreateProjectInput,
+  UpdateProjectContextInput,
   UpdateProjectInput,
 } from '@validation/project.schema.js';
 import { ProjectModel, ProjectType } from '@models/Project.js';
-import { sanitizeProjectResponse, sanitizeProjects } from '@utils/sanitizeProjectResponse.js';
+import { sanitizeProjectResponse, sanitizeProjects } from '@utils/sanitizers/sanitizeProjectResponse.js';
 import mongoose, { Types } from 'mongoose';
-import { Pagination, Sorting } from '../../types/Pagination.js';
+import type { Pagination, Sorting } from '@app-types/Pagination.js';
 import { ACTIVE_STATUSES } from './rules/projectStatus.js';
 import { transitionManyProjectsByIds } from './utils/transitionManyProjectsByIds.js';
 import { transitionProjectById } from './utils/transitionProjectById.js';
 import { ContextProfileModel, ContextScope, GenreType } from '@models/ContextProfile.js';
-import { NARRATION_PROFILES } from 'constants/narrationProfiles.js';
+import { NARRATION_PROFILES } from '@constants/narrationProfiles.js';
+import { withTransaction } from '@db/withTransaction.js';
 
 export async function getProjects(userId: Types.ObjectId | string, pagination: Pagination, sorting: Sorting) {
   const filter = { userId, status: { $eq: 'active' } };
@@ -373,6 +375,58 @@ export async function createProjectContextProfile(
 }
 
 // TODO:createUpdatedContextProfile function
+
+export async function updateProjectContextProfile(
+  userId: string,
+  projectId: string,
+  payload: UpdateProjectContextInput
+) {
+  return withTransaction(async (session) => {
+    const project = await ProjectModel.findOne({ _id: projectId, userId }).session(session);
+    if (!project) throw new NotFoundError('Project not found');
+
+    const narrationProfile = NARRATION_PROFILES[payload.genre as GenreType];
+
+    const [newContext] = await ContextProfileModel.create(
+      [
+        {
+          userId,
+          projectId,
+          name: payload.name,
+          description: payload.description,
+          genre: payload.genre,
+          mood: payload.mood,
+          style: payload.style,
+          narrativeScope: payload.narrativeScope,
+          environment: payload.environment,
+          worldRules: payload.worldRules,
+          narrativeConstraints: payload.narrativeConstraints,
+          characters: payload.characters,
+          forbiddenElements: payload.forbiddenElements,
+          narrationProfile,
+          scope: ContextScope.PROJECT,
+          isDefaultForProject: true,
+          lastUsedAt: new Date(),
+        },
+      ],
+      { session }
+    );
+
+    // Demote the previous default
+    if (project.defaultContextProfileId) {
+      await ContextProfileModel.updateOne(
+        { _id: project.defaultContextProfileId },
+        { $set: { isDefaultForProject: false } },
+        { session }
+      );
+    }
+
+    project.defaultContextProfileId = newContext._id;
+    await project.save({ session });
+
+    return sanitizeProjectResponse({ project, type: 'getProjectById' });
+  });
+}
 
 export async function updateProjectById(
   projectId: Types.ObjectId | string,

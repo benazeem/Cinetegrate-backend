@@ -9,11 +9,11 @@ import {
   RegenerateStoryInput,
   SetStoryContextInput,
 } from '@validation/story.schema.js';
-import { NARRATION_PROFILES } from 'constants/narrationProfiles.js';
-import { openRouterAI } from 'libs/ai/clients/openAI.js';
+import { NARRATION_PROFILES } from '@constants/narrationProfiles.js';
+import { openRouterAI } from '@libs/ai/clients/openAI.js';
 import { generateStoryPrompt } from '@libs/ai/prompts/generateStoryPrompt.js';
-import { generateStoryRegenerationPrompt } from 'libs/ai/prompts/generateStoryRegenerationPrompt.js';
-import { Pagination, Sorting } from 'types/Pagination.js';
+import { generateStoryRegenerationPrompt } from '@libs/ai/prompts/generateStoryRegenerationPrompt.js';
+import type { Pagination, Sorting } from '@app-types/Pagination.js';
 import { isSameContextContract } from 'domain/policies/isSameContextContract.js';
 import { validateStoryOwnership } from 'validators/validateStoryOwnership.js';
 import { withTransaction } from '@db/withTransaction.js';
@@ -23,6 +23,7 @@ import {
   assertStoryNotDeleted,
 } from 'domain/assertions/assertStoryState.js';
 import { consumeCredits } from '@modules/credit/credit.service.js';
+import { sanitizeStoryResponse, sanitizeStoriesResponse } from '@utils/sanitizers/sanitizeStoryResponse.js';
 
 export async function getUserStories(userId: string, pagination: Pagination, sorting: Sorting) {
   const [stories, total] = await Promise.all([
@@ -168,6 +169,7 @@ export async function addStoryContextService(
         {
           userId,
           projectId: story.projectId,
+          storyId: story._id,
           name: context.name,
           description: context.description,
           genre: context.genre,
@@ -202,6 +204,11 @@ export async function addStoryContextService(
       contextPayload: newContext,
     };
   });
+}
+
+export async function listStoryContextProfilesService(userId: string, storyId: string) {
+  const story = await validateStoryOwnership(userId, storyId);
+  return ContextProfileModel.find({ storyId: story._id, userId }).sort({ createdAt: -1 });
 }
 
 export async function setStoryContextService(userId: string, storyId: string, payload: SetStoryContextInput) {
@@ -308,7 +315,6 @@ export async function generateStory(userId: string, storyId: string) {
     const story = await validateStoryOwnership(userId, storyId, session);
     const contextProfile = await ContextProfileModel.findById(story.contextProfileId).session(session);
     
-    console.log(userId)
     const prompt = generateStoryPrompt({
       title: story.title,
       description: story.description,

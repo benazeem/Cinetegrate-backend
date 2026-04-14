@@ -1,12 +1,12 @@
 import { Schema, model, Document, Types } from 'mongoose';
 
-//RULE: deletedAt != null  ⇒ active must be false
 export interface Scene extends Document {
   userId: Types.ObjectId;
   storyId: Types.ObjectId;
   order: number;
   title?: string;
   description: string;
+  status: 'not-generated' | 'generating' | 'ready' | 'error';
   narrativeRole: 'intro' | 'transition' | 'climax' | 'outro' | 'standard';
   authorType: 'ai' | 'user';
   imagePrompt: string;
@@ -45,10 +45,14 @@ const sceneSchema = new Schema<Scene>(
       trim: true,
       maxlength: 200,
     },
-
     description: {
       type: String,
       required: true,
+    },
+    status: {
+      type: String,
+      enum: ['not-generated', 'generating', 'ready', 'error'],
+      default: 'not-generated',
     },
     narrativeRole: {
       type: String,
@@ -82,7 +86,7 @@ const sceneSchema = new Schema<Scene>(
     },
     deletedAt: {
       type: Date,
-      default: undefined, 
+      default: undefined,
     },
   },
   { timestamps: true }

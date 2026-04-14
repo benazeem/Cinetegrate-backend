@@ -2,7 +2,7 @@ import { ContextProfile } from '@models/ContextProfile.js';
 import { GLOBAL_SAFETY_RULES } from '../constants/globalSafetyRules.js';
 import { FULL_STORY_NARRATION_STRUCTURE_FORMAT } from '../constants/narrationPromptConsts.js';
 import { Platform, StoryIntent } from '@constants/storyConsts.js';
-import { StoryContent } from 'types/index.js';
+import { StoryContent } from '@app-types/index.js';
 
 type BuildFullNarrationPromptInput = {
   storyTitle: string;

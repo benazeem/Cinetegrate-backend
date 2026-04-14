@@ -8,23 +8,24 @@ import {
 } from '@middleware/error/index.js';
 import { SessionModel } from '@models/Session.js';
 import { type User, UserModel } from '@models/User.js';
-import { sanitizeUserResponse } from '@utils/sanitizeUserResponse.js';
+import { sanitizeUserResponse } from '@utils/sanitizers/sanitizeUserResponse.js';
 import { UpdateNotificationsType, UpdatePrivacySettingsType } from '@validation/user.schema.js';
 import { generateVerificationToken } from '@utils/tokens.js';
 import sendUpdateEmailLink from '@utils/emails/sender/sendUpdateEmailLink.js';
 import sendOldEmailVerificationForEmailUpdate from '@utils/emails/sender/sendOldEmailVerificationForEmailUpdate.js';
 import { withTransaction } from '@db/withTransaction.js';
+import { deleteFile, uploadFile } from '@libs/aws/s3.js';
 
-export const getProfile = async (userId: string): Promise<User> => {
-  const user = await UserModel.findById(userId)
-    .select('-passwordHash -emailVerificationToken -resetPasswordToken -createdAt -updatedAt')
-    .catch((err) => {
-      throw new InternalServerError('Could not fetch user profile', err.message);
-    });
+export const getProfile = async (userId: string): Promise<Partial<User>> => {
+  const user = await UserModel.findById(userId).catch((err) => {
+    throw new InternalServerError('Could not fetch user profile', err.message);
+  });
   if (!user) {
     throw new NotFoundError('User not found');
   }
-  return user;
+
+  const resUser = sanitizeUserResponse(user, 'profile');
+  return resUser;
 };
 
 export const updateProfile = async (userId: string, updateData: Partial<User>): Promise<Partial<User>> => {
@@ -46,12 +47,27 @@ export const updateAvatar = async (
   if (!avatarData) {
     throw new BadRequestError('Avatar file not found');
   }
-  const { filename, path } = avatarData;
+  const { buffer, mimetype } = avatarData;
 
-  //TODO: Add logic to move the file from temp to cloud storage like s3 or similar
-  // For now, we will just use the filename as is
-  const avatarUrl = `${path}/${filename}`;
+  const existingUser = await UserModel.findById(userId);
 
+  if (!existingUser) {
+    throw new NotFoundError('User not found');
+  }
+
+  const key = `avatars/${userId}/${Date.now()}`;
+
+  const avatarUrl = await uploadFile({
+    buffer,
+    key,
+    contentType: mimetype,
+  });
+
+  if (existingUser.avatarUrl) {
+    const oldKey = existingUser.avatarUrl.replace(`${process.env.CDN_URL}/`, '');
+
+    await deleteFile(oldKey);
+  }
   const user = await UserModel.findByIdAndUpdate(userId, { avatarUrl: avatarUrl }, { new: true });
   if (!user) {
     throw new NotFoundError('User not found');
@@ -67,15 +83,13 @@ export const deleteAvatar = async (userId: string): Promise<void> => {
   }
   const oldAvatarUrl = user.avatarUrl;
 
-  /** TODO:
-   * Retrieves the current avatar URL from the user object before updating it.
-   * This variable stores the old avatar URL to enable cleanup of the previous avatar file
-   * from cloud storage if a new avatar is uploaded during the update process.
-   * If no avatar currently exists, this will be undefined or null, and the cleanup step should be skipped.
-   */
   if (!oldAvatarUrl) {
     return;
   }
+
+  deleteFile(oldAvatarUrl.replace(`${process.env.CDN_URL}/`, '')).catch((err) => {
+    console.error('Failed to delete old avatar from S3', oldAvatarUrl, err);
+  });
 
   await UserModel.findByIdAndUpdate(userId, { $unset: { avatarUrl: '' } }, { new: true });
   return;

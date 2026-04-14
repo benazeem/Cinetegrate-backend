@@ -2,7 +2,7 @@ import { AudioAsset, AudioAssetModel } from '@models/AudioAsset.js';
 import { StoryNarrationModel } from '@models/Narration.js';
 import { NotFoundError, BadRequestError, ConflictError } from '@middleware/error/index.js';
 import { ClientSession } from 'mongoose';
-import type { Pagination, Sorting } from 'types/Pagination.js';
+import type { Pagination, Sorting } from '@app-types/Pagination.js';
 import { validateNarrationOwnership } from 'validators/validateNarrationOwnership.js';
 import { validateAudioAssetOwnership } from 'validators/validateAudioAssetOwnership.js';
 import {

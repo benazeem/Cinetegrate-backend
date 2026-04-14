@@ -1,3 +1,4 @@
+// Narration timing constants
 export const DEFAULT_WORDS_PER_SECOND = 2.5;
 export const MAX_NARRATION_LENGTH = 20000;
 export const NARRATION_VERSION_GAP = 1;

@@ -11,7 +11,7 @@ export async function openRouterAI(prompt: string): Promise<any> {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'google/gemma-3-27b-it:free',
+      model: 'google/gemma-4-31b-it:free',
       temperature: 0.7,
       messages: [
         {

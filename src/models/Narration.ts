@@ -9,6 +9,7 @@ export interface NarrationSegment {
   minWords: number;
   maxWords: number;
   narration: string;
+  source?: 'ai' | 'manual';
 }
 
 export interface StoryNarration extends Document {
@@ -21,6 +22,7 @@ export interface StoryNarration extends Document {
   narrationSegments: NarrationSegment[];
   version: number;
   active: boolean;
+  status: 'not-generated' | 'generating' | 'ready' | 'error';
   deletedAt?: Date;
   source: 'ai' | 'user';
   createdAt: Date;
@@ -73,6 +75,11 @@ const narrationSegmentSchema = new Schema<NarrationSegment>(
     character: {
       type: String,
       trim: true,
+    },
+    source: {
+      type: String,
+      enum: ['ai', 'manual'],
+      default: 'ai',
     },
   },
   { _id: false }

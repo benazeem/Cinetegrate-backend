@@ -1,5 +1,5 @@
 import { BadRequestError, ConflictError, NotFoundError } from "@middleware/error/index.js";
-import { sanitizeProjectResponse } from "@utils/sanitizeProjectResponse.js";
+import { sanitizeProjectResponse } from "@utils/sanitizers/sanitizeProjectResponse.js";
 import { canTransition, ProjectStatus } from "../rules/projectStatus.js";
 import { ProjectModel } from "@models/Project.js";
 import { Types } from "mongoose";

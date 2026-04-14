@@ -1,5 +1,5 @@
 import { BadRequestError } from '@middleware/error/index.js';
-import type { AIMode, Plan } from 'types/index.js';
+import type { AIMode, Plan } from '@app-types/index.js';
 
 type ModelConfig =
   | {

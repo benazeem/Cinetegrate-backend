@@ -1,9 +1,6 @@
 import { z } from 'zod';
+import { MAX_NARRATION_LENGTH } from '@constants/narrationConsts.js';
 
-// Constants
-const MAX_NARRATION_LENGTH = 20000;
-
-// Narration segment schema
 export const narrationSegmentSchema = z
   .object({
     startTime: z.number().min(0, 'Start time must be non-negative'),

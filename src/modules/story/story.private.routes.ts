@@ -19,6 +19,7 @@ import {
   writeContentController,
   setStoryContextController,
   addStoryContextController,
+  listStoryContextProfilesController,
 } from './story.controller.js';
 import { paginationAndSortingMiddleware } from '@middleware/request/paginationAndSorting.js';
 import { asyncHandler } from '@utils/asyncHandler.js';
@@ -67,6 +68,11 @@ router.post(
   asyncHandler(createStoryController)
 );
 router.get('/:storyId', validateParams(storyIdParamSchema), asyncHandler(getStoryByIdController));
+router.get(
+  '/:storyId/context-profiles',
+  validateParams(storyIdParamSchema),
+  asyncHandler(listStoryContextProfilesController)
+);
 router.post(
   '/:storyId/context-profile',
   validateBody(addStoryContextSchema),

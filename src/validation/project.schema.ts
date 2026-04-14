@@ -106,6 +106,9 @@ export const createProjectContextProfileSchema = z.discriminatedUnion('mode', [
   useGlobalProjectContextSchema,
 ]);
 
+export const updateProjectContextProfileSchema = newProjectContextSchema.shape.data;
+
 export type ProjectIdParam = z.infer<typeof projectIdParamSchema>;
 export type UpdateManyIdsInput = z.infer<typeof updateManyIdsSchema>;
 export type CreateProjectContextInput = z.infer<typeof createProjectContextProfileSchema>;
+export type UpdateProjectContextInput = z.infer<typeof updateProjectContextProfileSchema>;

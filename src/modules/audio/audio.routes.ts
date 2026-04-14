@@ -13,7 +13,6 @@ import {
   regenerateAudioAssetSchema,
   uploadAudioAssetSchema,
   setActiveAudioAssetSchema,
-  updateAudioAssetSchema,
   bulkDeleteAudioAssetsSchema,
   bulkRestoreAudioAssetsSchema,
 } from '@validation/audio.schema.js';

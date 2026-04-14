@@ -2,7 +2,7 @@ import type { Request, Response, NextFunction } from 'express';
 import { UnauthorizedError } from '@middleware/error/index.js';
 import { SessionModel } from '@models/Session.js';
 import { verifyToken } from '@utils/tokens.js';
-import { ALLOWED_ORIGINS } from 'constants/globalConts.js';
+import { ALLOWED_ORIGINS } from '@constants/globalConts.js';
 
 export const csrfMiddleware = async (req: Request, res: Response, next: NextFunction) => {
   const unsafeMethods = ['POST', 'PUT', 'PATCH', 'DELETE'];
@@ -10,8 +10,8 @@ export const csrfMiddleware = async (req: Request, res: Response, next: NextFunc
     return next();
   }
 
-  const origin = req.headers.Origin;
-  if (origin && (origin === 'null' || !ALLOWED_ORIGINS.includes(origin as string))) {
+  const origin = req.header('Origin') || req.headers['origin'] || req.headers.origin;
+  if (!origin && (origin === 'null' || !ALLOWED_ORIGINS.includes(origin as string))) {
     throw new UnauthorizedError('Invalid origin');
   }
 

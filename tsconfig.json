@@ -27,6 +27,8 @@
       "@constants/*": ["constants/*"],
       "@security/*": ["security/*"],
       "@domain/*": ["domain/*"],
+      "@shared/*": ["shared/*"],
+      "@app-types/*": ["types/*"]
     }
   },
   "include": ["src", "dist"]

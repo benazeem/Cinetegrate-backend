@@ -9,9 +9,11 @@ import {
   SCENE_STRUCTURE_FORMAT,
 } from '../constants/scenesPromptConts.js';
 import { BadRequestError } from '@middleware/error/index.js';
-import { StoryContent } from 'types/index.js';
+import { StoryContent } from '@app-types/index.js';
 
-export type SingleSceneMode = 'generate' | 'variation' | 'regenerate';
+import type { SingleSceneMode } from '@app-types/Scene.js';
+
+export type { SingleSceneMode };
 
 type BuildSingleScenePromptInput = {
   mode: SingleSceneMode;

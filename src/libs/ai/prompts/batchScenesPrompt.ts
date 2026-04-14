@@ -7,9 +7,11 @@ import {
   MULTI_SCENE_REGENERATION_PROMPT,
   MULTI_SCENE_STRUCTURE_FORMAT,
 } from '../constants/scenesPromptConts.js';
-import { StoryContent } from 'types/index.js';
+import { StoryContent } from '@app-types/index.js';
 
-export type BatchSceneMode = 'generate' | 'regenerate';
+import type { BatchSceneMode } from '@app-types/Scene.js';
+
+export type { BatchSceneMode };
 
 type BuildBatchScenePromptInput = {
   mode: BatchSceneMode;

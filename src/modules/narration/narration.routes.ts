@@ -40,7 +40,6 @@ router.get(
 router.get(
   '/story/:storyId/deleted',
   validateParams(storyIdParamSchema),
-  paginationAndSortingMiddleware,
   asyncHandler(getAllDeletedNarrationsController)
 );
 

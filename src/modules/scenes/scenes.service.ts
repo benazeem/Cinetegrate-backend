@@ -1,3 +1,4 @@
+import fs from 'fs/promises';
 import safeParseJSON from '@utils/safeParseJSON.js';
 import { SceneModel, Scene } from '@models/Scene.js';
 import { StoryModel } from '@models/Story.js';
@@ -16,6 +17,7 @@ import type {
   RegenerateSceneInput,
   GenerateSceneInput,
   DurationInput,
+  UploadSceneItemInput,
 } from '@validation/scenes.schema.js';
 import { singleScenePrompt } from '@libs/ai/prompts/singleScenePrompt.js';
 import { openRouterAI } from '@libs/ai/clients/openAI.js';
@@ -30,12 +32,10 @@ import {
   assertSceneIsDeleted,
   assertSceneNotDeleted,
 } from 'domain/assertions/assertSceneState.js';
-import {
-  validateSceneOwnership,
-  validateStorySceneOwnership,
-} from 'validators/validateSceneOwnership.js';
-import e from 'express';
+import { validateSceneOwnership, validateStorySceneOwnership } from 'validators/validateSceneOwnership.js';
 import { validateUser } from 'validators/validateUser.js';
+import type { SanitizedScene } from '@utils/sanitizers/sanitizeScenesResponse.js';
+import { sanitizeScenesResponse } from '@utils/sanitizers/sanitizeScenesResponse.js';
 
 // -> Ordering Helpers
 async function getNextOrderValue(storyId: string, session?: ClientSession): Promise<number> {
@@ -105,7 +105,7 @@ export async function getSceneCount(userId: string, storyId: string): Promise<nu
   return count;
 }
 
-export async function getAllScenesForStory(userId: string, storyId: string): Promise<Scene[]> {
+export async function getAllScenesForStory(userId: string, storyId: string): Promise<SanitizedScene[]> {
   await validateStoryOwnership(userId, storyId);
 
   const scenes = await SceneModel.find({
@@ -113,30 +113,43 @@ export async function getAllScenesForStory(userId: string, storyId: string): Pro
     userId,
     active: true,
     deletedAt: { $exists: false },
-  }).sort({ order: 1 });
+  })
+    .populate('activeAssetId')
+    .sort({ order: 1 });
 
-  return scenes;
+  const resScenes = sanitizeScenesResponse(scenes);
+
+  return resScenes;
 }
 
-export async function getAllInactiveScenesForStory(userId: string, storyId: string): Promise<Scene[]> {
+export async function getAllInactiveScenesForStory(
+  userId: string,
+  storyId: string
+): Promise<SanitizedScene[]> {
   await validateStoryOwnership(userId, storyId);
   const scenes = await SceneModel.find({
     storyId,
     userId,
     active: false,
     deletedAt: { $exists: false },
-  }).sort({ order: 1 });
-  return scenes;
+  })
+    .populate('activeAssetId')
+    .sort({ order: 1 });
+  const resScenes = sanitizeScenesResponse(scenes);
+  return resScenes;
 }
 
-export async function getAllDeletedScenes(userId: string, storyId: string): Promise<Scene[]> {
+export async function getAllDeletedScenes(userId: string, storyId: string): Promise<SanitizedScene[]> {
   await validateStoryOwnership(userId, storyId);
   const scenes = await SceneModel.find({
     storyId,
     userId,
     deletedAt: { $exists: true },
-  }).sort({ order: 1 });
-  return scenes;
+  })
+    .populate('activeAssetId')
+    .sort({ order: 1 });
+  const resScenes = sanitizeScenesResponse(scenes);
+  return resScenes;
 }
 
 export async function generateAllScenes(userId: string, storyId: string, total: number): Promise<Scene[]> {
@@ -219,6 +232,88 @@ export async function generateAllScenes(userId: string, storyId: string, total: 
 
     return scenes;
   });
+}
+
+export async function createScenesFromJSON(
+  userId: string,
+  storyId: string,
+  scenes: UploadSceneItemInput[]
+): Promise<Scene[]> {
+  return withTransaction(async (session) => {
+    await validateStoryOwnership(userId, storyId, session);
+
+    if (!Array.isArray(scenes) || scenes.length === 0) {
+      throw new BadRequestError('Invalid scenes: expected a non-empty array');
+    }
+
+    const existing = await SceneModel.find(
+      { storyId, userId, deletedAt: { $exists: false } },
+      { _id: 1 }
+    ).session(session);
+
+    if (existing.length > 0) {
+      const deactivateOps = existing.map((doc, i) => ({
+        updateOne: {
+          filter: { _id: doc._id },
+          update: {
+            $set: {
+              active: false,
+              order: -(Date.now() * 1000 + i),
+            },
+          },
+        },
+      }));
+
+      await SceneModel.bulkWrite(deactivateOps, { session });
+    }
+
+    const scenesToCreate = scenes.map((scene, index) => ({
+      userId,
+      storyId,
+      order: (index + 1) * SCENE_ORDER_GAP,
+      title: scene.title,
+      description: scene.description,
+      authorType: 'user' as const,
+      imagePrompt: scene.imagePrompt,
+      videoPrompt: scene.videoPrompt,
+      duration: scene.duration,
+      active: true,
+    }));
+
+    const createdScenes = (await SceneModel.insertMany(scenesToCreate, {
+      session,
+      ordered: true,
+    })) as Scene[];
+
+    return createdScenes;
+  });
+}
+
+export async function uploadScenesJSONFromFile(
+  userId: string,
+  storyId: string,
+  fileSource: Buffer | string
+): Promise<Scene[]> {
+  let parsed: any;
+
+  try {
+    const fileContent =
+      typeof fileSource === 'string' ? await fs.readFile(fileSource, 'utf-8') : fileSource.toString('utf-8');
+
+    if (!fileContent) {
+      throw new BadRequestError('Uploaded file is empty');
+    }
+
+    parsed = JSON.parse(fileContent);
+  } catch (err) {
+    throw new BadRequestError('Invalid JSON file format', err);
+  }
+
+  if (!parsed || !Array.isArray(parsed.scenes)) {
+    throw new BadRequestError('Invalid JSON structure. Expected { scenes: [...] }');
+  }
+
+  return createScenesFromJSON(userId, storyId, parsed.scenes as UploadSceneItemInput[]);
 }
 
 export async function regenerateAllScenes(

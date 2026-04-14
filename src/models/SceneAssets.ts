@@ -6,7 +6,9 @@ export interface SceneAsset extends Document {
   sceneId: Types.ObjectId;
   type: 'image' | 'video';
   url: string;
+  thumbnailUrl?: string;
   visibility: 'private' | 'public';
+  status: 'not-generated' | 'generating' | 'ready' | 'error';
   prompt?: string;
   generationSource: 'ai' | 'user';
   version: number;
@@ -42,10 +44,18 @@ const sceneAssetSchema = new Schema<SceneAsset>(
       type: String,
       required: true,
     },
+    thumbnailUrl: {
+      type: String,
+    },
     visibility: {
       type: String,
       enum: ['private', 'public'],
       default: 'public',
+    },
+    status: {
+      type: String,
+      enum: ['not-generated', 'generating', 'ready', 'error'],
+      default: 'not-generated',
     },
     prompt: {
       type: String,

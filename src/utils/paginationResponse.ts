@@ -1,4 +1,4 @@
-import { Pagination } from 'types/Pagination.js';
+import type { Pagination } from '@app-types/Pagination.js';
 
 export function paginationResponse(pagination: Pagination, totalItems: number) {
   return {

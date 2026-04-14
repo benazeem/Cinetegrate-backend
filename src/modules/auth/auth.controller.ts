@@ -19,177 +19,127 @@ import type {
   VerifyEmailInput,
   VerifyUpdateEmailInput,
 } from '@validation/auth.schema.js';
+import { sendSuccess } from '@shared/response.js';
 
-const CookieOptions: CookieOptions = {
+// ─── Cookie Configuration ───────────────────────────────────────────────────
+
+const CSRF_AGE   = 15 * 24 * 60 * 60 * 1000; // 15 days
+const REFRESH_AGE = 15 * 24 * 60 * 60 * 1000; // 15 days
+const ACCESS_AGE  =      30 * 60 * 1000;       // 30 minutes
+
+const cookieOptions: CookieOptions = {
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
   sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-  maxAge: 1 * 24 * 60 * 60 * 1000,
+  maxAge: ACCESS_AGE,
 };
 
-const CSRF_AGE = 15 * 24 * 60 * 60 * 1000;
-const REFRESH_AGE = 15 * 24 * 60 * 60 * 1000;
-const ACCESS_AGE = 30 * 60 * 1000;
+/** Sets the three auth cookies (access / refresh / csrf) on the response. */
+function setAuthCookies(res: Response, tokens: { accessToken: string; refreshToken: string; csrfToken: string }) {
+  res
+    .cookie('access-token',  tokens.accessToken,  { ...cookieOptions, maxAge: ACCESS_AGE })
+    .cookie('refresh-token', tokens.refreshToken, { ...cookieOptions, maxAge: REFRESH_AGE })
+    .cookie('csrf-token',    tokens.csrfToken,    { ...cookieOptions, httpOnly: false, maxAge: CSRF_AGE });
+}
+
+// ─── Controllers ────────────────────────────────────────────────────────────
 
 export const registerController = async (req: Request, res: Response) => {
   const body = req.validatedBody as RegisterInput;
+  const userAgent = req.headers['user-agent'] || 'unknown';
+  const ip =
+    req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.ip || req.socket.remoteAddress;
 
-  const userAgent: string = req.headers['user-agent'] || 'unknown';
-  const ip = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.ip || req.socket.remoteAddress;
+  const { user, tokens } = await registerUser({ ...body, userAgent, ip });
 
-  const payload = { ...body, userAgent, ip };
+  setAuthCookies(res, tokens);
 
-  const result = await registerUser(payload);
-
-  const { user, tokens } = result;
-  const { accessToken, refreshToken, csrfToken } = tokens;
-
-  return res
-    .status(200)
-    .cookie('access-token', accessToken, {
-      ...CookieOptions,
-      maxAge: ACCESS_AGE,
-    })
-    .cookie('refresh-token', refreshToken, {
-      ...CookieOptions,
-      maxAge: REFRESH_AGE,
-    })
-    .cookie('csrf-token', csrfToken, {
-      ...CookieOptions,
-      httpOnly: false,
-      maxAge: CSRF_AGE,
-    })
-    .json({
+  return res.status(201).json({
+    message: 'Account created successfully',
+    data: {
       user: {
-        id: user._id,
         email: user.email,
         username: user.username,
-        displayName: user.displayName,
-        avatar: user.avatarUrl,
+        displayName: user.displayName ?? null,
+        avatarUrl: user.avatarUrl ?? null,
       },
-    });
+    },
+  });
 };
 
 export const loginController = async (req: Request, res: Response) => {
   const body = req.validatedBody as LoginInput;
-  const userAgent: string = req.headers['user-agent'] || 'unknown';
-  const ip = req.socket.remoteAddress || req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.ip;
+  const userAgent = req.headers['user-agent'] || 'unknown';
+  const ip =
+    req.socket.remoteAddress || req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.ip;
 
-  const payload = { ...body, userAgent, ip };
+  const { user, tokens } = await loginUser({ ...body, userAgent, ip });
 
-  const result = await loginUser(payload);
-  const { user, tokens } = result;
-  const { accessToken, refreshToken, csrfToken } = tokens;
+  setAuthCookies(res, tokens);
 
-  return res
-    .status(200)
-    .cookie('access-token', accessToken, {
-      ...CookieOptions,
-      maxAge: ACCESS_AGE,
-    })
-    .cookie('refresh-token', refreshToken, {
-      ...CookieOptions,
-      maxAge: REFRESH_AGE,
-    })
-    .cookie('csrf-token', csrfToken, {
-      ...CookieOptions,
-      httpOnly: false,
-      maxAge: CSRF_AGE,
-    })
-    .json({
-      status: 'success',
-      data: {
-        user: {
-          id: user._id,
-          email: user.email,
-          username: user.username,
-          displayName: user.displayName,
-          avatar: user.avatarUrl,
-          accountStatus: user.accountStatus,
-        },
+  return res.status(200).json({
+    message: 'Logged in successfully',
+    data: {
+      user: {
+        email: user.email,
+        username: user.username,
+        displayName: user.displayName ?? null,
+        avatarUrl: user.avatarUrl ?? null,
+        accountStatus: user.accountStatus,
       },
-    });
+    },
+  });
 };
 
 export const forgotPasswordController = async (req: Request, res: Response) => {
-  const payload = req.validatedBody as ForgetPasswordInput;
-  await createPasswordResetRequest(payload.email);
-  return res.status(200).json({
-    status: 'success',
-    message: 'If an account with that email exists, a reset link has been sent.',
-  });
+  const { email } = req.validatedBody as ForgetPasswordInput;
+  await createPasswordResetRequest(email);
+  return sendSuccess(res, null, 'If an account with that email exists, a reset link has been sent.');
 };
 
 export const resetPasswordController = async (req: Request, res: Response) => {
-  const { token, password } = req.validatedBody as {
-    token: string;
-    password: string;
-  };
+  const { token, password } = req.validatedBody as { token: string; password: string };
   await resetPassword(token, password);
-  return res.status(200).json({
-    status: 'success',
-    message: 'Password updated. Please log in with your new password.',
-  });
+  return sendSuccess(res, null, 'Password updated. Please log in with your new password.');
 };
 
 export const refreshTokenController = async (req: Request, res: Response) => {
   const reqRefreshToken = req.cookies['refresh-token'];
-  const userAgent: string = req.headers['user-agent'] || 'unknown';
-  const ip = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.ip || req.socket.remoteAddress;
+  const userAgent = req.headers['user-agent'] || 'unknown';
+  const ip =
+    req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.ip || req.socket.remoteAddress;
+
   if (!reqRefreshToken) {
-    throw new UnauthenticatedError('No refresh token, Authentication failed');
+    throw new UnauthenticatedError('No refresh token, authentication failed');
   }
 
-  const result = await refreshTokens(reqRefreshToken, userAgent, ip);
-  const { accessToken, refreshToken, csrfToken } = result;
-  return res
-    .status(200)
-    .cookie('access-token', accessToken, {
-      ...CookieOptions,
-      maxAge: ACCESS_AGE,
-    })
-    .cookie('refresh-token', refreshToken, {
-      ...CookieOptions,
-      maxAge: REFRESH_AGE,
-    })
-    .cookie('csrf-token', csrfToken, {
-      ...CookieOptions,
-      httpOnly: false,
-      maxAge: CSRF_AGE,
-    })
-    .json({ message: 'Tokens refreshed' });
+  const tokens = await refreshTokens(reqRefreshToken, userAgent, ip);
+  setAuthCookies(res, tokens);
+
+  return sendSuccess(res, null, 'Tokens refreshed');
 };
 
 export const emailVerificationController = async (req: Request, res: Response) => {
-  const userId = req?.user!.id;
-
+  const userId = req.user!.id;
   await sendEmailVerification(userId);
-  return res.status(200).json({
-    message: 'Verification email sent successfully',
-  });
+  return sendSuccess(res, null, 'Verification email sent successfully');
 };
 
 export const verifyEmailController = async (req: Request, res: Response) => {
   const { verificationToken } = req.validatedBody as VerifyEmailInput;
-
   await verifyEmail(verificationToken);
-  return res.status(200).json({
-    message: 'Email verified successfully',
-  });
+  return sendSuccess(res, null, 'Email verified successfully');
 };
 
 export const verifyEmailChangeController = async (req: Request, res: Response) => {
   const { verificationToken, code } = req.validatedBody as VerifyUpdateEmailInput;
-  const currentSessionId = req?.sessionId;
+  const currentSessionId = req.sessionId;
   await verifyUpdateEmail(verificationToken, code, currentSessionId);
-  return res.status(200).json({
-    message: 'Email change verified successfully',
-  });
+  return sendSuccess(res, null, 'Email change verified successfully');
 };
 
 export const logoutController = async (req: Request, res: Response) => {
   const refreshToken = req.cookies['refresh-token'];
-
   await logoutUser(refreshToken);
 
   return res
@@ -197,5 +147,5 @@ export const logoutController = async (req: Request, res: Response) => {
     .clearCookie('refresh-token')
     .clearCookie('csrf-token')
     .status(200)
-    .json({ message: 'Logged out successfully' });
+    .json({ message: 'Logged out successfully', data: null });
 };

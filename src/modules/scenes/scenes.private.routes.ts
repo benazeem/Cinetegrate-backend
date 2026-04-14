@@ -14,8 +14,10 @@ import {
   generateSceneSchema,
   regenerateSceneSchema,
   generateAllScenesSchema,
+  uploadScenesJSONSchema,
   durationSchema,
 } from '@validation/scenes.schema.js';
+import { scenesJSONUpload } from '@middleware/multer/scenesJSONUpload.js';
 
 import {
   getAllStoryScenesController,
@@ -37,6 +39,8 @@ import {
   permanentDeleteSceneController,
   generateScenesController,
   regenerateScenesController,
+  uploadScenesJSONController,
+  uploadScenesFileController,
   generateSingleSceneController,
   regenerateSceneController,
   getSceneCountController,
@@ -126,6 +130,20 @@ router.post(
   validateParams(storyIdParamSchema),
   validateBody(regenerateSceneSchema),
   asyncHandler(regenerateScenesController)
+);
+
+router.post(
+  '/:storyId/upload-json',
+  validateParams(storyIdParamSchema),
+  validateBody(uploadScenesJSONSchema),
+  asyncHandler(uploadScenesJSONController)
+);
+
+router.post(
+  '/:storyId/upload-file',
+  validateParams(storyIdParamSchema),
+  scenesJSONUpload,
+  asyncHandler(uploadScenesFileController)
 );
 
 router.get(

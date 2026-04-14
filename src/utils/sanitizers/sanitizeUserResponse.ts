@@ -1,36 +1,70 @@
 import type { User } from '@models/User.js';
+import type { UserReturnType } from '@app-types/index.js';
 
-type UserReturnType = 'profile' | 'settings' | 'security' | 'billing' | 'account';
-
+/**
+ * Sanitizes a User document before sending it to the frontend.
+ * Never exposes: userId (_id as raw ObjectId), passwordHash, passwordReset,
+ * emailVerification, pendingEmailChange, changeHistory, or any internal fields.
+ */
 export const sanitizeUserResponse = (user: User, type: UserReturnType) => {
   switch (type) {
     case 'profile':
       return {
-        _id: user._id,
+        id: user._id.toString(),
+
         email: user.email,
         username: user.username,
-        displayName: user.displayName,
-        avatarUrl: user.avatarUrl ?? null,
+        displayName: user.displayName ?? null,
         bio: user.bio ?? null,
-        links: user.links ?? {},
-        plan: user.currentPlan,
+        avatarUrl: user.avatarUrl ?? null,
+
+        role: user.role,
+
         emailVerified: user.emailVerified,
-        usage: user.usage,
+        phoneVerified: user.phoneVerified,
+        twoFactorEnabled: user.twoFactorEnabled,
+
         accountStatus: user.accountStatus,
+        billingStatus: user.billingStatus,
+        cancelAtPeriodEnd: user.cancelAtPeriodEnd,
+
+        links: {
+          website: user.links?.website ?? null,
+          youtube: user.links?.youtube ?? null,
+          twitter: user.links?.twitter ?? null,
+          instagram: user.links?.instagram ?? null,
+          linkedin: user.links?.linkedin ?? null,
+          facebook: user.links?.facebook ?? null,
+          github: user.links?.github ?? null,
+        },
+
+        oauthProviders: user.oauthProviders ?? [],
+
+        notificationPrefs: {
+          emailOnJobComplete: user.notificationPrefs?.emailOnJobComplete ?? true,
+          inApp: user.notificationPrefs?.inApp ?? true,
+          marketingEmails: user.notificationPrefs?.marketingEmails ?? false,
+        },
+
+        privacyPrefs: {
+          profileVisibility: user.privacyPrefs?.profileVisibility ?? 'private',
+          showEmailOnProfile: user.privacyPrefs?.showEmailOnProfile ?? false,
+          showLinksOnProfile: user.privacyPrefs?.showLinksOnProfile ?? true,
+        },
+
+        createdAt: user.createdAt,
       };
 
     case 'settings':
       return {
-        _id: user._id,
         email: user.email,
         username: user.username,
-        displayName: user.displayName,
+        displayName: user.displayName ?? null,
         avatarUrl: user.avatarUrl ?? null,
         bio: user.bio ?? null,
         plan: user.currentPlan,
         privacyPrefs: user.privacyPrefs ?? {},
         notificationPrefs: user.notificationPrefs ?? {},
-        usage: user.usage,
         links: user.links ?? {},
       };
 
@@ -56,23 +90,23 @@ export const sanitizeUserResponse = (user: User, type: UserReturnType) => {
         currentPeriodEnd: user.currentPeriodEnd ?? null,
         trialEndsAt: user.trialEndsAt ?? null,
         cancelAtPeriodEnd: user.cancelAtPeriodEnd ?? false,
-        usage: user.usage,
       };
 
     case 'account':
       return {
-        _id: user._id,
+        id: user._id.toString(),
         email: user.email,
         username: user.username,
-        displayName: user.displayName,
+        displayName: user.displayName ?? null,
         avatarUrl: user.avatarUrl ?? null,
         role: user.role,
-        status: user.accountStatus, // enum: active, suspended, banned, deleted
+        accountStatus: user.accountStatus,
         createdAt: user.createdAt,
       };
+
     default:
       return {
-        _id: user._id,
+        id: user._id.toString(),
         username: user.username,
         displayName: user.displayName ?? null,
         avatarUrl: user.avatarUrl ?? null,

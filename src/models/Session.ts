@@ -31,7 +31,6 @@ const sessionSchema = new Schema({
   cpu: { type: String },
   engine: { type: String },
   refreshTokenHash: { type: String, required: true },
-  csrfTokenHash: { type: String, required: true },
   expiresIn: { type: Date, required: true },
   createdAt: { type: Date, default: Date.now },
   lastUsedAt: { type: Date, default: Date.now },

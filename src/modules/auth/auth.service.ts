@@ -176,7 +176,7 @@ export async function refreshTokens(
     userId: decoded.userId,
     valid: true,
     revokedAt: null,
-  }).select('+refreshTokenHash +csrfTokenHash +expiresIn');
+  }).select('+refreshTokenHash  +expiresIn');
 
   if (!session || !session.refreshTokenHash || !session.expiresIn) {
     throw new UnauthenticatedError('No refresh token, Authentication failed');
@@ -219,7 +219,6 @@ export async function refreshTokens(
     },
     {
       refreshTokenHash: hashToken(newRefreshToken),
-      csrfTokenHash: hashToken(newCsrfToken),
       lastUsedAt: new Date(),
       userAgent,
       ip: Array.isArray(ip) ? ip[0] : ip,

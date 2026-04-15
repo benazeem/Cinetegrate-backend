@@ -23,23 +23,27 @@ import { sendSuccess } from '@shared/response.js';
 
 // ─── Cookie Configuration ───────────────────────────────────────────────────
 
-const CSRF_AGE   = 15 * 24 * 60 * 60 * 1000; // 15 days
+const CSRF_AGE = 15 * 24 * 60 * 60 * 1000; // 15 days
 const REFRESH_AGE = 15 * 24 * 60 * 60 * 1000; // 15 days
-const ACCESS_AGE  =      30 * 60 * 1000;       // 30 minutes
+const ACCESS_AGE = 30 * 60 * 1000; // 30 minutes
 
 const cookieOptions: CookieOptions = {
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
   sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+  domain: process.env.NODE_ENV === 'production' ? process.env.PARENT_DOMAIN : undefined,
   maxAge: ACCESS_AGE,
 };
 
 /** Sets the three auth cookies (access / refresh / csrf) on the response. */
-function setAuthCookies(res: Response, tokens: { accessToken: string; refreshToken: string; csrfToken: string }) {
+function setAuthCookies(
+  res: Response,
+  tokens: { accessToken: string; refreshToken: string; csrfToken: string }
+) {
   res
-    .cookie('access-token',  tokens.accessToken,  { ...cookieOptions, maxAge: ACCESS_AGE })
+    .cookie('access-token', tokens.accessToken, { ...cookieOptions, maxAge: ACCESS_AGE })
     .cookie('refresh-token', tokens.refreshToken, { ...cookieOptions, maxAge: REFRESH_AGE })
-    .cookie('csrf-token',    tokens.csrfToken,    { ...cookieOptions, httpOnly: false, maxAge: CSRF_AGE });
+    .cookie('csrf-token', tokens.csrfToken, { ...cookieOptions, httpOnly: false, maxAge: CSRF_AGE });
 }
 
 // ─── Controllers ────────────────────────────────────────────────────────────
@@ -47,8 +51,7 @@ function setAuthCookies(res: Response, tokens: { accessToken: string; refreshTok
 export const registerController = async (req: Request, res: Response) => {
   const body = req.validatedBody as RegisterInput;
   const userAgent = req.headers['user-agent'] || 'unknown';
-  const ip =
-    req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.ip || req.socket.remoteAddress;
+  const ip = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.ip || req.socket.remoteAddress;
 
   const { user, tokens } = await registerUser({ ...body, userAgent, ip });
 
@@ -70,8 +73,7 @@ export const registerController = async (req: Request, res: Response) => {
 export const loginController = async (req: Request, res: Response) => {
   const body = req.validatedBody as LoginInput;
   const userAgent = req.headers['user-agent'] || 'unknown';
-  const ip =
-    req.socket.remoteAddress || req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.ip;
+  const ip = req.socket.remoteAddress || req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.ip;
 
   const { user, tokens } = await loginUser({ ...body, userAgent, ip });
 
@@ -106,8 +108,7 @@ export const resetPasswordController = async (req: Request, res: Response) => {
 export const refreshTokenController = async (req: Request, res: Response) => {
   const reqRefreshToken = req.cookies['refresh-token'];
   const userAgent = req.headers['user-agent'] || 'unknown';
-  const ip =
-    req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.ip || req.socket.remoteAddress;
+  const ip = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.ip || req.socket.remoteAddress;
 
   if (!reqRefreshToken) {
     throw new UnauthenticatedError('No refresh token, authentication failed');

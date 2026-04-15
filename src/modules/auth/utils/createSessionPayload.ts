@@ -33,7 +33,6 @@ export async function createSessionPayload({
     browser: userAgentInfo.browser,
     os: userAgentInfo.os,
     refreshTokenHash: hashToken(refreshToken),
-    csrfTokenHash: hashToken(csrfToken),
     expiresIn: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     createdAt: new Date(),
     lastUsedAt: new Date(),

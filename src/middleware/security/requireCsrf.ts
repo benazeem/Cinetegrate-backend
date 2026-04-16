@@ -2,36 +2,72 @@ import crypto from 'crypto';
 import { ALLOWED_ORIGINS } from '@constants/globalConts.js';
 import { UnauthorizedError } from '@middleware/error/index.js';
 import { NextFunction, Request, Response } from 'express';
-import { compareHashTokens } from '@utils/tokens.js';
+import logger from '@utils/logger.js';
+
+const unsafeMethods = ['POST', 'PUT', 'PATCH', 'DELETE'];
+
+const normalizeToken = (val: string): string => {
+  try {
+    return decodeURIComponent(val).replace(/^"|"$/g, '').trim();
+  } catch {
+    return val.replace(/^"|"$/g, '').trim();
+  }
+};
+
+const safeCompare = (a: string, b: string): boolean => {
+  const aBuf = Buffer.from(a);
+  const bBuf = Buffer.from(b);
+
+  if (aBuf.length !== bBuf.length) return false;
+
+  return crypto.timingSafeEqual(aBuf, bBuf);
+};
 
 export const csrfMiddleware = (req: Request, _res: Response, next: NextFunction) => {
-  const unsafeMethods = ['POST', 'PUT', 'PATCH', 'DELETE'];
-  if (!unsafeMethods.includes(req.method)) return next();
-
-  const origin = req.headers.origin || req.headers.referer;
-
-  if (!origin) {
-    throw new UnauthorizedError('Missing Origin or Referer header');
+  if (!unsafeMethods.includes(req.method)) {
+    return next();
   }
 
-  const originUrl = new URL(origin as string).origin;
-  if (!ALLOWED_ORIGINS.includes(originUrl)) {
-    throw new UnauthorizedError('Invalid origin');
+  const rawOrigin = req.headers.origin || req.headers.referer;
+
+  if (rawOrigin) {
+    try {
+      const originUrl = new URL(rawOrigin as string).origin;
+
+      if (!ALLOWED_ORIGINS.includes(originUrl)) {
+        return next(new UnauthorizedError('Invalid origin'));
+      }
+    } catch {
+      return next(new UnauthorizedError('Invalid origin format'));
+    }
   }
 
-  const csrfHeader = req.headers['x-csrf-token'];
-  const csrfToken = Array.isArray(csrfHeader) ? csrfHeader[0] : csrfHeader;
-  const csrfCookie = req.cookies['csrf-token'];
+  const csrfHeaderRaw = req.headers['x-csrf-token'];
+  const csrfHeader = Array.isArray(csrfHeaderRaw) ? csrfHeaderRaw[0] : csrfHeaderRaw;
 
-  if (!csrfToken || !csrfCookie) {
-    throw new UnauthorizedError('CSRF credentials missing');
+  const csrfCookieRaw = req.cookies['csrf-token'];
+
+  if (!csrfHeader || !csrfCookieRaw) {
+    return next(new UnauthorizedError('CSRF credentials missing'));
   }
 
-  const tokenMatch = compareHashTokens(csrfToken, csrfCookie);
+  const csrfToken = normalizeToken(csrfHeader);
+  const csrfCookie = normalizeToken(csrfCookieRaw);
 
-  if (!tokenMatch) {
-    throw new UnauthorizedError('Invalid CSRF token');
+  const isValid = safeCompare(csrfToken, csrfCookie);
+
+  if (!isValid) {
+    logger.warn(`'CSRF DEBUG',
+      header: ${csrfHeader},
+      cookie: ${csrfCookieRaw},
+      normalizedHeader: ${csrfToken},
+      normalizedCookie: ${csrfCookie},
+      headerLength: ${csrfToken.length},
+      cookieLength: ${csrfCookie.length},
+    `);
+
+    return next(new UnauthorizedError('Invalid CSRF token'));
   }
 
-  next();
+  return next();
 };

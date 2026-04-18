@@ -10,6 +10,9 @@ const ACCESS_TOKEN_SECRET: string = process.env.ACCESS_TOKEN_SECRET!;
 const REFRESH_TOKEN_EXPIRES_IN: SignOptions['expiresIn'] = process.env
   .REFRESH_TOKEN_EXPIRES_IN as SignOptions['expiresIn'];
 const REFRESH_TOKEN_SECRET: string = process.env.REFRESH_TOKEN_SECRET!;
+const CSRF_TOKEN_EXPIRES_IN: SignOptions['expiresIn'] = process.env
+  .CSRF_TOKEN_EXPIRES_IN as SignOptions['expiresIn'];
+const CSRF_TOKEN_SECRET: string = process.env.CSRF_TOKEN_SECRET!;
 
 export function generateVerificationToken(bytes = 32) {
   const raw = crypto.randomBytes(bytes).toString('hex');
@@ -60,13 +63,14 @@ export function generateAccessToken(
     expiresIn: ACCESS_TOKEN_EXPIRES_IN,
   });
 }
-export function generateRefreshToken(userId: Types.ObjectId, sessionId: string, reduceTime: boolean = false) {
+export function generateRefreshToken(userId: Types.ObjectId, sessionId: string) {
   return jwt.sign({ userId, sessionId }, REFRESH_TOKEN_SECRET, {
     expiresIn: REFRESH_TOKEN_EXPIRES_IN,
   });
 }
 
-export function generateCsrfToken() {
-  const token = crypto.randomBytes(24).toString('hex');
-  return token;
+export function generateCsrfToken(userId: Types.ObjectId, sessionId: string) {
+  return jwt.sign({ userId, sessionId }, CSRF_TOKEN_SECRET, {
+    expiresIn: CSRF_TOKEN_EXPIRES_IN,
+  });
 }

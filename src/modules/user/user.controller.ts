@@ -28,12 +28,16 @@ import {
   updateProfile,
 } from './user.service.js';
 import { sendSuccess } from '@shared/response.js';
-import { BadRequestError } from '@middleware/error/index.js';
+import { BadRequestError, UnauthorizedError } from '@middleware/error/index.js';
 
 export const getProfileController = async (req: Request, res: Response) => {
   const userId = req.user!.id;
   const user = await getProfile(userId);
-  return sendSuccess(res, user, 'Profile retrieved successfully');
+
+  return res.status(200).json({
+    message: 'Profile retrieved successfully',
+    data: user,
+  });
 };
 
 export const updateProfileController = async (req: Request, res: Response) => {

@@ -54,8 +54,6 @@ export async function registerUser(input: RegisterInputWithMeta): Promise<SignOu
       throw new ConflictError('Email already registered');
     }
   }
-  // Metadata
-
   const passwordHash = await bcrypt.hash(password, 10);
 
   return withTransaction(async (session) => {
@@ -210,8 +208,6 @@ export async function refreshTokens(
 
   const newRefreshToken = generateRefreshToken(user._id, session.sessionId);
 
-  const newCsrfToken = generateCsrfToken();
-
   await SessionModel.updateOne(
     {
       _id: session._id,
@@ -228,7 +224,6 @@ export async function refreshTokens(
   return {
     accessToken: newAccessToken,
     refreshToken: newRefreshToken,
-    csrfToken: newCsrfToken,
   };
 }
 

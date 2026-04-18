@@ -2,7 +2,7 @@ import { SessionData } from '../../../models/Session.js';
 import { generateAllCookieTokens } from '@utils/generateAllCookieTokens.js';
 import { getIpInfo } from '@utils/getIpInfo.js';
 import { parseUserAgent } from '@utils/parseUserAgent.js';
-import { hashToken } from '@utils/tokens.js';
+import { generateCsrfToken, hashToken } from '@utils/tokens.js';
 import crypto from 'crypto';
 import { User } from '@models/User.js';
 
@@ -18,12 +18,13 @@ export async function createSessionPayload({
   const ipData: any = await getIpInfo(ip);
   const userAgentInfo = parseUserAgent(userAgent);
   const sessionId = crypto.randomBytes(32).toString('hex');
-  const { accessToken, refreshToken, csrfToken } = generateAllCookieTokens(
+  const { accessToken, refreshToken } = generateAllCookieTokens(
     user._id,
     sessionId,
     user.role,
     user.accountStatus
   );
+  const csrfToken = generateCsrfToken(user._id, sessionId);
 
   let sessionPayload: Partial<SessionData> = {
     sessionId,

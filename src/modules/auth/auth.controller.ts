@@ -21,9 +21,6 @@ import type {
 } from '@validation/auth.schema.js';
 import { sendSuccess } from '@shared/response.js';
 
-// ─── Cookie Configuration ───────────────────────────────────────────────────
-
-const CSRF_AGE = 15 * 24 * 60 * 60 * 1000; // 15 days
 const REFRESH_AGE = 15 * 24 * 60 * 60 * 1000; // 15 days
 const ACCESS_AGE = 30 * 60 * 1000; // 30 minutes
 
@@ -33,9 +30,9 @@ const cookieOptions: CookieOptions = {
   sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
   domain: process.env.NODE_ENV === 'production' ? process.env.PARENT_DOMAIN : undefined,
   maxAge: ACCESS_AGE,
+  path: '/',
 };
 
-/** Sets the three auth cookies (access / refresh / csrf) on the response. */
 function setAuthCookies(
   res: Response,
   tokens: { accessToken: string; refreshToken: string; csrfToken: string }
@@ -43,10 +40,12 @@ function setAuthCookies(
   res
     .cookie('access-token', tokens.accessToken, { ...cookieOptions, maxAge: ACCESS_AGE })
     .cookie('refresh-token', tokens.refreshToken, { ...cookieOptions, maxAge: REFRESH_AGE })
-    .cookie('csrf-token', tokens.csrfToken, { ...cookieOptions, httpOnly: false, maxAge: CSRF_AGE });
+    .cookie('csrf_token', tokens.csrfToken, {
+      ...cookieOptions,
+      httpOnly: false,
+      maxAge: REFRESH_AGE,
+    });
 }
-
-// ─── Controllers ────────────────────────────────────────────────────────────
 
 export const registerController = async (req: Request, res: Response) => {
   const body = req.validatedBody as RegisterInput;
@@ -67,6 +66,7 @@ export const registerController = async (req: Request, res: Response) => {
         avatarUrl: user.avatarUrl ?? null,
       },
     },
+    csrfToken: tokens.csrfToken,
   });
 };
 
@@ -90,6 +90,32 @@ export const loginController = async (req: Request, res: Response) => {
         accountStatus: user.accountStatus,
       },
     },
+    csrfToken: tokens.csrfToken,
+  });
+};
+
+export const refreshTokenController = async (req: Request, res: Response) => {
+  const reqRefreshToken = req.cookies['refresh-token'];
+  const userAgent = req.headers['user-agent'] || 'unknown';
+  const ip = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.ip || req.socket.remoteAddress;
+  const csrfToken = req.cookies?.['csrf_token'];
+
+  if (!reqRefreshToken) {
+    throw new UnauthenticatedError('No refresh token, authentication failed');
+  }
+
+  if (!csrfToken) {
+    throw new UnauthenticatedError('Missing CSRF token');
+  }
+
+  const tokens = await refreshTokens(reqRefreshToken, userAgent, ip);
+  const allTokens = { ...tokens, csrfToken };
+  setAuthCookies(res, allTokens);
+
+  return res.status(200).json({
+    message: 'Tokens refreshed successfully',
+    data: null,
+    csrfToken: csrfToken,
   });
 };
 
@@ -103,21 +129,6 @@ export const resetPasswordController = async (req: Request, res: Response) => {
   const { token, password } = req.validatedBody as { token: string; password: string };
   await resetPassword(token, password);
   return sendSuccess(res, null, 'Password updated. Please log in with your new password.');
-};
-
-export const refreshTokenController = async (req: Request, res: Response) => {
-  const reqRefreshToken = req.cookies['refresh-token'];
-  const userAgent = req.headers['user-agent'] || 'unknown';
-  const ip = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.ip || req.socket.remoteAddress;
-
-  if (!reqRefreshToken) {
-    throw new UnauthenticatedError('No refresh token, authentication failed');
-  }
-
-  const tokens = await refreshTokens(reqRefreshToken, userAgent, ip);
-  setAuthCookies(res, tokens);
-
-  return sendSuccess(res, null, 'Tokens refreshed');
 };
 
 export const emailVerificationController = async (req: Request, res: Response) => {
@@ -146,7 +157,7 @@ export const logoutController = async (req: Request, res: Response) => {
   return res
     .clearCookie('access-token')
     .clearCookie('refresh-token')
-    .clearCookie('csrf-token')
+    .clearCookie('csrf_token')
     .status(200)
     .json({ message: 'Logged out successfully', data: null });
 };

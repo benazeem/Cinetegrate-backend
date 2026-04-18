@@ -1,72 +1,56 @@
-import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
 import { ALLOWED_ORIGINS } from '@constants/globalConts.js';
 import { UnauthorizedError } from '@middleware/error/index.js';
 import { NextFunction, Request, Response } from 'express';
-import logger from '@utils/logger.js';
 
 const unsafeMethods = ['POST', 'PUT', 'PATCH', 'DELETE'];
 
-const normalizeToken = (val: string): string => {
-  try {
-    return decodeURIComponent(val).replace(/^"|"$/g, '').trim();
-  } catch {
-    return val.replace(/^"|"$/g, '').trim();
-  }
-};
-
-const safeCompare = (a: string, b: string): boolean => {
-  const aBuf = Buffer.from(a);
-  const bBuf = Buffer.from(b);
-
-  if (aBuf.length !== bBuf.length) return false;
-
-  return crypto.timingSafeEqual(aBuf, bBuf);
-};
-
 export const csrfMiddleware = (req: Request, _res: Response, next: NextFunction) => {
-  if (!unsafeMethods.includes(req.method)) {
-    return next();
-  }
+  if (!unsafeMethods.includes(req.method)) return next();
 
   const rawOrigin = req.headers.origin || req.headers.referer;
 
-  if (rawOrigin) {
-    try {
-      const originUrl = new URL(rawOrigin as string).origin;
-
-      if (!ALLOWED_ORIGINS.includes(originUrl)) {
-        return next(new UnauthorizedError('Invalid origin'));
-      }
-    } catch {
-      return next(new UnauthorizedError('Invalid origin format'));
-    }
+  if (!rawOrigin) {
+    return next(new UnauthorizedError('Missing origin'));
   }
 
-  const csrfHeaderRaw = req.headers['x-csrf-token'];
-  const csrfHeader = Array.isArray(csrfHeaderRaw) ? csrfHeaderRaw[0] : csrfHeaderRaw;
-
-  const csrfCookieRaw = req.cookies['csrf-token'];
-
-  if (!csrfHeader || !csrfCookieRaw) {
-    return next(new UnauthorizedError('CSRF credentials missing'));
+  let origin: string;
+  try {
+    origin = new URL(rawOrigin as string).origin;
+  } catch {
+    return next(new UnauthorizedError('Invalid origin format'));
   }
 
-  const csrfToken = normalizeToken(csrfHeader);
-  const csrfCookie = normalizeToken(csrfCookieRaw);
+  if (!ALLOWED_ORIGINS.includes(origin)) {
+    return next(new UnauthorizedError('Invalid origin'));
+  }
 
-  const isValid = safeCompare(csrfToken, csrfCookie);
+  const headerTokenRaw = req.headers['x-csrf-token'];
+  const headerToken = Array.isArray(headerTokenRaw) ? headerTokenRaw[0] : headerTokenRaw;
 
-  if (!isValid) {
-    logger.warn(`'CSRF DEBUG',
-      header: ${csrfHeader},
-      cookie: ${csrfCookieRaw},
-      normalizedHeader: ${csrfToken},
-      normalizedCookie: ${csrfCookie},
-      headerLength: ${csrfToken.length},
-      cookieLength: ${csrfCookie.length},
-    `);
+  const cookieToken = req.cookies?.['csrf_token'];
 
+  if (!headerToken || !cookieToken) {
+    return next(new UnauthorizedError('Missing CSRF token'));
+  }
+
+  if (headerToken !== cookieToken) {
+    return next(new UnauthorizedError('CSRF token mismatch'));
+  }
+
+  let decoded: any;
+  try {
+    decoded = jwt.verify(headerToken, process.env.CSRF_TOKEN_SECRET!);
+  } catch {
     return next(new UnauthorizedError('Invalid CSRF token'));
+  }
+
+  if (!req.sessionId || decoded.sessionId !== req.sessionId) {
+    return next(new UnauthorizedError('Invalid CSRF session'));
+  }
+
+  if (decoded.userId && req.user?.id && decoded.userId !== req.user.id) {
+    return next(new UnauthorizedError('CSRF user mismatch'));
   }
 
   return next();
